@@ -37,7 +37,7 @@ etime, start
 	}
 
 * Do-files path
-	gl thedo     "$path/do-files" // Do-files path
+	gl thedo     "$path/Do-files" // Do-files path
 
 * Globals for country and year identification
 	gl country BGD 			// Country to upload
@@ -45,7 +45,7 @@ etime, start
 	gl final_year `yyyy'	// Change for last simulated year
 
 * Globals for country-specific paths
-	gl inputs   "${path}/inputs/Inputs elasticities `yyyy'.xlsx" // Country's input Excel file
+	gl inputs   "${path}/Inputs/Inputs elasticities `yyyy'.xlsx" // Country's input Excel file
 	
 	cap mkdir "${path}/Data"
 	gl data_out "${path}/Data"
@@ -165,40 +165,58 @@ set more off
 	local code="$country"
 	local year0=$baseyear
 	local cpiversion="09"	
-	cap datalibweb, country(Support) year(2005) type(GMDRAW) surveyid(Support_2005_CPI_v`cpiversion'_M) filename(Final_CPI_PPP_to_be_used.dta)
-	if _rc {
-		use "${path}/Data/datalib_support_2005_GMDRAW.dta", clear
+	
+	* Download CPI from datalibweb, in Windows
+	if "`c(os)'"=="Windows" {
+		cap datalibweb, country(Support) year(2005) type(GMDRAW) surveyid(Support_2005_CPI_v`cpiversion'_M) filename(Final_CPI_PPP_to_be_used.dta)
+		if _rc {
+			noi di ""
+			noi di as error "Note: Downloading data from datalibweb failed. Verify connection"
+			stop
+		}
+		else Dsave"${path}/Data/datalib_support_2005_GMDRAW.dta", replace
 	}
-	else {
-		save"${path}/Data/datalib_support_2005_GMDRAW.dta", replace
+	
+	if _rc {
+		
 	}
 
+	if "`c(os)'"=="MacOSX" {
+		noi di ""
+		noi di as message "Note: MacOSX, datalibweb skipped. CPI data should exist alreay in the Data/ folder"
+		cap use "${path}/Data/datalib_support_2005_GMDRAW.dta", clear
+		if _rc {
+			noi di as error "CPI data not found. Download it using datalibweb in Windows"
+		}
+	}
+	
+	* Save CPI temporary file
 	keep if code=="`code'" & year==`year0'
 	keep code year cpi2017 icp2017
 	rename code countrycode
 	tempfile dlwcpi
 	save `dlwcpi', replace
 
-
 	* 0. load data
-		do "$thedo/0_load_data.do"
+	do "$thedo/00_load_data.do"
 
-		drop cpi2017
-		merge m:1 countrycode year using `dlwcpi'
-		keep if _merge==3
-		drop _merge
-		save "$path/Data/HIES 2022/BGD_2022_HIES_v02_M_v02_A_SARMD_SIM.dta", replace
+	drop cpi2017
+	merge m:1 countrycode year using `dlwcpi'
+	keep if _merge==3
+	drop _merge
+	save "$path/Data/HIES 2022/BGD_2022_HIES_v02_M_v02_A_SARMD_SIM.dta", replace
 	
 *===========================================================================
 * run programs
 *===========================================================================
-
-local files : dir "$thedo/programs" files "*.do"
-foreach f of local files{
-	dis in yellow "`f'"
-	qui: run "$thedo/programs//`f'"
+{
+	* Load all simulation programs
+	local files : dir "$thedo" files "0*_*.do"
+	foreach f of local files{
+		dis in yellow "`f'"
+		qui: run "$thedo/`f'"
+	}
 }
-
 *===========================================================================
 * run dofiles
 *===========================================================================
@@ -232,27 +250,6 @@ foreach f of local files{
 
 drop if welfarenom==.
 save "${data_out}/basesim_${model}", replace
-*stop
-/*
-* 14. poverty line adjustment
-	run "$thedo/14_prices_consump.do"
-* 15. compensation - emergency bonus
-    run "$thedo/15_transfers_emergency_bonus.do"
-* 16. aumento cobertura BDH
-   // do "$thedo/16_transfers_bdh.do"
-* 17. results
-	run "$thedo/17_labels.do"
-* 18. export results back to the Excel	
-    run "$thedo/18_results.do"
-* Mitigation Measures
-	if inlist("${country}","CHL") & "${model}"=="2021" run "$thedo/${country}_mm2021.do"
-	if inlist("${country}","CHL","PAN","ECU","PER","PRY") & !inlist("${model}","2021") run "$thedo/${country}_mm.do"
-	if "${country}"=="BRA" {
-		if inlist("${model}","2022","2023") run "$thedo/${country}_mm${model}.do"
-		else run "$thedo/${country}_mm.do"
-	}
-	if "${country}"=="MEX" & "${model}"!="2019" run "$thedo/${country}_mm.do"
-*/
 
 *===========================================================================
 * quick summary
