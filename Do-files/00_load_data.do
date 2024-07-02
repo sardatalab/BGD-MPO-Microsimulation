@@ -18,24 +18,24 @@
 		foreach module in LBR INC IND {
 			cap datalibweb, country(BGD) year(2022) type(SARMD) vermast(02) veralt(02) survey(HIES) module(`module') clear
 			if _rc {
-				noi di "Note: file not found in datalibweb"
-				global `module' "${path}/Data/HIES 2022/BGD_2022_HIES_v02_M_v02_A_SARMD_`module'.dta"
+				noi di as text "Note: file not found in datalibweb"
+				global `module' "$data_in/HIES 2022/BGD_2022_HIES_v02_M_v02_A_SARMD_`module'.dta"
 			}
 		
 			else {
 				save "${path}/Data/HIES 2022/`r(filename)'", replace
 				noi di "`r(filename)'"	// BGD_2022_HIES_v02_M_v02_A_SARMD_LBR.dta
-				global `module' "$path/Data/HIES 2022/`r(filename)'"
+				global `module' "$data_in/HIES 2022/`r(filename)'"
 			}
 		}
 		}
 		
 		if "`c(os)'"=="MacOSX" {
 		noi di ""
-		noi di as message "MacOSX, datalibweb skipped"
+		noi di as text "MacOSX, datalibweb skipped"
 		foreach module in LBR INC IND {
 			
-			global `module' "${path}/Data/HIES 2022/BGD_2022_HIES_v02_M_v02_A_SARMD_`module'.dta"
+			global `module' "$data_in/HIES 2022/BGD_2022_HIES_v02_M_v02_A_SARMD_`module'.dta"
 		}
 		}	
 	}

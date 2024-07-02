@@ -42,13 +42,12 @@ etime, start
 * Globals for country and year identification
 	gl country BGD 			// Country to upload
 	gl year 2022			// Year to upload - Base year dataset
-	gl final_year `yyyy'	// Change for last simulated year
-
-* Globals for country-specific paths
-	gl inputs   "${path}/Inputs/Inputs elasticities `yyyy'.xlsx" // Country's input Excel file
+	gl final_year 2027		// Change for last simulated year
 	
 	cap mkdir "${path}/Data"
-	gl data_out "${path}/Data"
+	gl data  	"${path}/Data"
+	gl data_in  "${path}/Data/INPUT"
+	gl data_out "${path}/Data/OUTPUT"
 
 * Parameters
 	*gl use_saved_parameters "yes" // Not working yet
@@ -71,7 +70,7 @@ etime, start
 	* with the name batch_`i'.do located in the working directory.
 	* The iniyear and finyear locals above will be modified.
 
-	local parallel 	"yes"	// If "yes", the program will run in parallel mode
+	local parallel 	""	// If "yes", the program will run in parallel mode
 	
 		local iniparallelyear = 2022	// First batch file to be created
 		local finparallelyear = 2027	// Last batch file to be created
@@ -147,21 +146,10 @@ etime, start
 }
 
 *===============================================================================
-* Microsimulation master loop
+* Load and save household survey
 *===============================================================================
-
-forval yyyy = `iniyear'/`finyear' {
-
-clear all
-clear mata
-clear matrix
-set more off
-
-	*===========================================================================
-	* Select household survey
-	*===========================================================================
+{
 	
-	*Open datalib data ppp
 	local code="$country"
 	local year0=$baseyear
 	local cpiversion="09"	
@@ -174,19 +162,18 @@ set more off
 			noi di as error "Note: Downloading data from datalibweb failed. Verify connection"
 			stop
 		}
-		else Dsave"${path}/Data/datalib_support_2005_GMDRAW.dta", replace
+		else save "$data_in/datalib_support_2005_GMDRAW.dta", replace
 	}
 	
-	if _rc {
-		
-	}
-
+	* Read CPI in MacOSX
 	if "`c(os)'"=="MacOSX" {
 		noi di ""
-		noi di as message "Note: MacOSX, datalibweb skipped. CPI data should exist alreay in the Data/ folder"
-		cap use "${path}/Data/datalib_support_2005_GMDRAW.dta", clear
+		noi di as text "Note: MacOSX, datalibweb skipped. CPI data should exist alreay in the Data/ folder"
+		
+		cap use "$data_in/datalib_support_2005_GMDRAW.dta", clear
 		if _rc {
 			noi di as error "CPI data not found. Download it using datalibweb in Windows"
+			exit
 		}
 	}
 	
@@ -204,64 +191,66 @@ set more off
 	merge m:1 countrycode year using `dlwcpi'
 	keep if _merge==3
 	drop _merge
-	save "$path/Data/HIES 2022/BGD_2022_HIES_v02_M_v02_A_SARMD_SIM.dta", replace
-	
-*===========================================================================
-* run programs
-*===========================================================================
-{
-	* Load all simulation programs
-	local files : dir "$thedo" files "0*_*.do"
-	foreach f of local files{
-		dis in yellow "`f'"
-		qui: run "$thedo/`f'"
-	}
+	save "$data/BGD_2022_HIES_v02_M_v02_A_SARMD_SIM.dta", replace
 }
 *===========================================================================
 * run dofiles
 *===========================================================================
+{
 
-* 1.input parameters
-	do "$thedo/01_parameters.do"
-* 2.prepare variables
-	do "$thedo/02_variables.do"
-* 3.model labor incomes by groups
-	do "$thedo/03_occupation.do"
-* 4.model labor incomes by skills
-	do "$thedo/04_labor_income.do"
-* 5.modeling population growth
-	do "$thedo/05_population.do"
-* 6.modeling labor activity rate
-	do "$thedo/06_activity.do"
-* 7.modeling unemployment rate
-	do "$thedo/07_unemployment.do"
-* 8.modeling changes in employment by sectors
-	do "$thedo/08_struct_emp.do"
-* 9.modeling labor income by sector
-	do "$thedo/09_asign_labor_income.do"	
-* 10.income growth by sector
-	do "$thedo/$do_income.do"
-* 11. total labor incomes
-	do "$thedo/11_total_income.do"	
-* 12. total non-labor incomes
-	do "$thedo/12_assign_nlai.do"
-* 13. household income
-	do "$thedo/13_household_income.do"
+	forval yyyy = `iniyear'/`finyear' {
+		clear all
+		clear mata
+		clear matrix
 
-drop if welfarenom==.
-save "${data_out}/basesim_${model}", replace
+		* Load auxiliary simulation programs
+		local files : dir "$thedo/aux" files "*.do"
+		di `files'
+		foreach f of local files{
+			dis in yellow "`f'"
+			qui: run "$thedo/aux/`f'"
+		}
 
-*===========================================================================
-* quick summary
-*===========================================================================
+		* Use base household survey
+		if ${year}==2022 use "$data/BGD_2022_HIES_v02_M_v02_A_SARMD_SIM.dta", clear
+		
+		* Globals for reading scenarios
+		gl inputs   "$data_in/Macro and elasticities/Inputs elasticities `yyyy'.xlsx" // Country's input Excel file
 
-*sum poor* vuln midd upper [w=fexp_s] if pc_inc_s!=.
-ineqdec0 pc_inc_s  [w=fexp_s]
-*	ainequal pc_inc_s [w=fexp_s], all
+		* 1.input parameters
+			do "$thedo/01_parameters.do"
+		* 2.prepare variables
+			do "$thedo/02_variables.do"
+		* 3.model labor incomes by groups
+			do "$thedo/03_occupation.do"
+		* 4.model labor incomes by skills
+			do "$thedo/04_labor_income.do"
+		* 5.modeling population growth
+			do "$thedo/05_population.do"
+		* 6.modeling labor activity rate
+			do "$thedo/06_activity.do"
+		* 7.modeling unemployment rate
+			do "$thedo/07_unemployment.do"
+		* 8.modeling changes in employment by sectors
+			do "$thedo/08_struct_emp.do"
+		* 9.modeling labor income by sector
+			do "$thedo/09_asign_labor_income.do"	
+		* 10.income growth by sector
+			do "$thedo/$do_income.do"
+		* 11. total labor incomes
+			do "$thedo/11_total_income.do"	
+		* 12. total non-labor incomes
+			do "$thedo/12_assign_nlai.do"
+		* 13. household income
+			do "$thedo/13_household_income.do"
 
+		* Quick summary
+			ineqdec0 pc_inc_s  [w=fexp_s]
+			
+		drop if welfarenom==.
+		save "${data_out}/basesim_${model}", replace
+	}
 }
-
-
 *===========================================================================
 * Display running time	
 etime
