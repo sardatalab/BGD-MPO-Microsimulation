@@ -33,7 +33,7 @@ etime, start
 	}
 	* Windows
 	if c(os)=="Windows" & c(username)=="WB308767" {
-		 gl path  "C:/Users/WB308767/OneDrive - WBG/ETIRI/Projects/FY24/FY24 5 SAS - Bangladesh/main/BGD-MPO-Microsimulation"
+		 gl main  "C:/Users/WB308767/OneDrive/WBG/ETIRI/Projects/FY24/FY24 5 SAS - Bangladesh/main"
 	}
 
 * Path	
@@ -48,16 +48,21 @@ etime, start
 	gl final_year 2027		// Change for last simulated year
 	
 	cap mkdir "${path}/Data"
-	gl data  	"${path}/Data"
-	gl data_in  "${path}/Data/INPUT"
-	gl data_out "${path}/Data/OUTPUT"
+	gl data_root "${path}/Data"
+	gl data_in   "${path}/Data/INPUT"
+	gl data_out  "${path}/Data/OUTPUT"
 
 * Parameters
 	*gl use_saved_parameters "yes" // Not working yet
-	global re_scale "yes" // Change for "yes"/"no" re-scale using total income
-	global sector_model 6 // 
-	global random_remittances "no" // Change for "yes" or "no" on modelling
-	global baseyear 2022
+	gl re_scale "yes" // Change for "yes"/"no" re-scale using total income
+	gl sector_model 6 // 
+	gl random_remittances "no" // Change for "yes" or "no" on modelling
+	gl baseyear 2022
+
+* Databases
+	gl reload_dlw 	 ""		// if yes, updates databases from datalibweb
+	local loadhhdata ""		// if yes, save dta for Simulation (better in sequential mode)
+	local runsim	 "yes" 	// Run simulations
 }
 *===============================================================================
 * Sequential or parallel set-up
@@ -148,7 +153,9 @@ etime, start
 			
 			* Close myscript.sh file
 			file close myscript	
-			if "`parallel_automatic'"=="yes" !myscript.bat
+			if "`parallel_automatic'"=="yes" { 
+				!myscript.bat
+			}
 			etime
 			exit	
 		}
@@ -157,7 +164,7 @@ etime, start
 *===============================================================================
 * Load and save household survey
 *===============================================================================
-{
+if "`loadhhdata'"=="yes" {
 	
 	local code="$country"
 	local year0=$baseyear
@@ -165,13 +172,22 @@ etime, start
 	
 	* Download CPI from datalibweb, in Windows
 	if "`c(os)'"=="Windows" {
-		cap datalibweb, country(Support) year(2005) type(GMDRAW) surveyid(Support_2005_CPI_v`cpiversion'_M) filename(Final_CPI_PPP_to_be_used.dta)
-		if _rc {
-			noi di ""
-			noi di as error "Note: Downloading data from datalibweb failed. Verify connection"
-			stop
+		if "$reload_dlw"=="yes" {
+			cap datalibweb, country(Support) year(2005) type(GMDRAW) surveyid(Support_2005_CPI_v`cpiversion'_M) filename(Final_CPI_PPP_to_be_used.dta)
+			if _rc {
+				noi di ""
+				noi di as error "Note: Downloading data from datalibweb failed. Verify connection"
+				exit
+			}
+			else save "$data_in/datalib_support_2005_GMDRAW.dta", replace
 		}
-		else save "$data_in/datalib_support_2005_GMDRAW.dta", replace
+		if "$reload_dlw"=="" {
+			cap use "$data_in/datalib_support_2005_GMDRAW.dta", clear
+			if _rc {
+				noi di as error "CPI data not found. Download it using datalibweb in Windows"
+				exit
+			}	
+		}
 	}
 	
 	* Read CPI in MacOSX
@@ -200,12 +216,12 @@ etime, start
 	merge m:1 countrycode year using `dlwcpi'
 	keep if _merge==3
 	drop _merge
-	save "$data/BGD_2022_HIES_v02_M_v02_A_SARMD_SIM.dta", replace
+	save "$data_root/BGD_2022_HIES_v02_M_v02_A_SARMD_SIM.dta", replace
 }
 *===========================================================================
 * run dofiles
 *===========================================================================
-{
+if "`runsim'"=="yes" {
 
 	forval yyyy = `iniyear'/`finyear' {
 		clear all
@@ -221,7 +237,7 @@ etime, start
 		}
 
 		* Use base household survey
-		if ${year}==2022 use "$data/BGD_2022_HIES_v02_M_v02_A_SARMD_SIM.dta", clear
+		if ${year}==2022 use "$data_root/BGD_2022_HIES_v02_M_v02_A_SARMD_SIM.dta", clear
 		
 		* Globals for reading scenarios
 		gl inputs   "$data_in/Macro and elasticities/Inputs elasticities `yyyy'.xlsx" // Country's input Excel file

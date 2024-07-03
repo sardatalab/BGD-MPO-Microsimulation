@@ -1,14 +1,14 @@
 
   ___  ____  ____  ____  ____ ®
- /__    /   ____/   /   ____/      StataNow 18.5
+ /__    /   ____/   /   ____/      18.0
 ___/   /   /___/   /   /___/       MP—Parallel Edition
 
  Statistics and Data Science       Copyright 1985-2023 StataCorp LLC
                                    StataCorp
                                    4905 Lakeway Drive
                                    College Station, Texas 77845 USA
-                                   800-782-8272        https://www.stata.com
-                                   979-696-4600        service@stata.com
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
 
 Stata license: Unlimited-user 4-core network, expiring 16 Dec 2025
 Serial number: 501809302042
@@ -22,7 +22,10 @@ Notes:
       4. Maximum number of variables is set to 5,000 but can be increased;
           see help set_maxvar.
 
-. do batch_2023 
+
+Running C:\Program Files\Stata18\sysprofile.do ...
+
+. do batch_2023.do 
 
 . *!v1.0
 . *============================================================================
@@ -72,8 +75,8 @@ Notes:
 .         }
 .         * Windows
 .         if c(os)=="Windows" & c(username)=="WB308767" {
-.                  gl path  "C:/Users/WB308767/OneDrive - WBG/ETIRI/Projects/FY
-> 24/FY24 5 SAS - Bangladesh/main/BGD-MPO-Microsimulation"
+.                  gl main  "C:/Users/WB308767/OneDrive/WBG/ETIRI/Projects/FY24
+> /FY24 5 SAS - Bangladesh/main"
 .         }
 . 
 . * Path  
@@ -88,18 +91,24 @@ Notes:
 .         gl final_year 2027              // Change for last simulated year
 .         
 .         cap mkdir "${path}/Data"
-.         gl data         "${path}/Data"
-.         gl data_in  "${path}/Data/INPUT"
-.         gl data_out "${path}/Data/OUTPUT"
+.         gl data_root "${path}/Data"
+.         gl data_in   "${path}/Data/INPUT"
+.         gl data_out  "${path}/Data/OUTPUT"
 . 
 . * Parameters
 .         *gl use_saved_parameters "yes" // Not working yet
-.         global re_scale "yes" // Change for "yes"/"no" re-scale using total i
-> ncome
-.         global sector_model 6 // 
-.         global random_remittances "no" // Change for "yes" or "no" on modelli
-> ng
-.         global baseyear 2022
+.         gl re_scale "yes" // Change for "yes"/"no" re-scale using total incom
+> e
+.         gl sector_model 6 // 
+.         gl random_remittances "no" // Change for "yes" or "no" on modelling
+.         gl baseyear 2022
+. 
+. * Databases
+.         gl reload_dlw    ""             // if yes, updates databases from dat
+> alibweb
+.         local loadhhdata ""             // if yes, save dta for Simulation (b
+> etter in sequential mode)
+.         local runsim     "yes"  // Run simulations
 . }
 
 . *============================================================================
@@ -213,7 +222,9 @@ Notes:
 .                         
 .                         * Close myscript.sh file
 .                         file close myscript     
-.                         if "`parallel_automatic'"=="yes" !myscript.bat
+.                         if "`parallel_automatic'"=="yes" { 
+.                                 !myscript.bat
+.                         }
 .                         etime
 .                         exit    
 .                 }
@@ -225,7 +236,7 @@ Notes:
 . * Load and save household survey
 . *============================================================================
 > ===
-. {
+. if "`loadhhdata'"=="yes" {
 .         
 .         local code="$country"
 .         local year0=$baseyear
@@ -233,25 +244,35 @@ Notes:
 .         
 .         * Download CPI from datalibweb, in Windows
 .         if "`c(os)'"=="Windows" {
-.                 cap datalibweb, country(Support) year(2005) type(GMDRAW) surv
-> eyid(Support_2005_CPI_v`cpiversion'_M) filename(Final_CPI_PPP_to_be_used.dta)
-.                 if _rc {
-.                         noi di ""
-.                         noi di as error "Note: Downloading data from datalibw
-> eb failed. Verify connection"
-.                         stop
+.                 if "$reload_dlw"=="yes" {
+.                         cap datalibweb, country(Support) year(2005) type(GMDR
+> AW) surveyid(Support_2005_CPI_v`cpiversion'_M) filename(Final_CPI_PPP_to_be_u
+> sed.dta)
+.                         if _rc {
+.                                 noi di ""
+.                                 noi di as error "Note: Downloading data from 
+> datalibweb failed. Verify connection"
+.                                 exit
+.                         }
+.                         else save "$data_in/datalib_support_2005_GMDRAW.dta",
+>  replace
 .                 }
-.                 else save "$data_in/datalib_support_2005_GMDRAW.dta", replace
+.                 if "$reload_dlw"=="" {
+.                         cap use "$data_in/datalib_support_2005_GMDRAW.dta", c
+> lear
+.                         if _rc {
+.                                 noi di as error "CPI data not found. Download
+>  it using datalibweb in Windows"
+.                                 exit
+.                         }       
+.                 }
 .         }
 .         
 .         * Read CPI in MacOSX
 .         if (c(os)=="MacOSX"|c(os)=="Unix") {
 .                 noi di ""
-
 .                 noi di as text "Note: MacOSX/Unix, datalibweb skipped. CPI da
 > ta should exist alreay in the Data/ folder"
-Note: MacOSX/Unix, datalibweb skipped. CPI data should exist alreay in the Data
-> / folder
 .                 
 .                 cap use "$data_in/datalib_support_2005_GMDRAW.dta", clear
 .                 if _rc {
@@ -263,364 +284,25 @@ Note: MacOSX/Unix, datalibweb skipped. CPI data should exist alreay in the Data
 .         
 .         * Save CPI temporary file
 .         keep if code=="`code'" & year==`year0'
-(2,312 observations deleted)
 .         keep code year cpi2017 icp2017
 .         rename code countrycode
 .         tempfile dlwcpi
 .         save `dlwcpi', replace
-(file /var/folders/fc/5g_0xpf55dz7bg775xzr1vfw0000gp/T//St45878.000001 not
-    found)
-file /var/folders/fc/5g_0xpf55dz7bg775xzr1vfw0000gp/T//St45878.000001 saved
-    as .dta format
 . 
 .         * 0. load data
 .         do "$thedo/00_load_data.do"
-
-. *!v1.0 July 02, 2024
-. *============================================================================
-> ===
-. * Microsimulation load data
-. * Based on each simulation year, this program loads and save the base househo
-> ld
-. * survey data. It loads the labor (LBR), income (INC), individual (IND), and
-. * "IMP" modules.
-. *============================================================================
-> ===
-. {
-.         *====================================================================
-> =======
-.         * Save global with household survey to use
-.         *====================================================================
-> =======
-.         local year = $baseyear
-. 
-.         * Year: 2022
-.         if `year'==2022 {
-.                 
-.                 if c(os)=="Windows" {
-.                 foreach module in LBR INC IND {
-  2.                         cap datalibweb, country(BGD) year(2022) type(SARMD
-> ) vermast(02) veralt(02) survey(HIES) module(`module') clear
-  3.                         if _rc {
-  4.                                 noi di as text "Note: file not found in da
-> talibweb"
-  5.                                 global `module' "$data_in/HIES 2022/BGD_20
-> 22_HIES_v02_M_v02_A_SARMD_`module'.dta"
-  6.                         }
-  7.                 
-.                         else {
-  8.                                 save "${path}/Data/HIES 2022/`r(filename)'
-> ", replace
-  9.                                 noi di "`r(filename)'"  // BGD_2022_HIES_v
-> 02_M_v02_A_SARMD_LBR.dta
- 10.                                 global `module' "$data_in/HIES 2022/`r(fil
-> ename)'"
- 11.                         }
- 12.                 }
-.                 }
-.                 
-.                 if (c(os)=="MacOSX"|c(os)=="Unix") {
-.                 noi di ""
-
-.                 noi di as text "MacOSX, datalibweb skipped"
-MacOSX, datalibweb skipped
-.                 foreach module in LBR INC IND {
-  2.                         
-.                         global `module' "$data_in/HIES 2022/BGD_2022_HIES_v02
-> _M_v02_A_SARMD_`module'.dta"
-  3.                 }
-.                 }       
-.         }
-.         
-.         * Year: 2016 (legacy)
-.         if `year'==2016 {
-.                 global LBR "C:/Users/wb553773/OneDrive - WBG/BD/BGD Poverty A
-> ssessment 2023/Data/HIES 2016/BGD_2016_HIES_v01_M_v06_A_SARMD_LBR"
-.                 global INC "C:/Users/wb553773/OneDrive - WBG/BD/BGD Poverty A
-> ssessment 2023/Data/HIES 2016/BGD_2016_HIES_v01_M_v06_A_SARMD_INC"
-.                 global IND "C:/Users/wb553773/OneDrive - WBG/BD/BGD Poverty A
-> ssessment 2023/Data/HIES 2016/BGD_2016_HIES_v01_M_v06_A_SARMD_IND"
-.         }
-.         
-.         * Year: 2010 (legacy)
-.         if `year'==2010 {
-.                 global LBR "C:/Users/wb553773/OneDrive - WBG/BD/BGD Poverty A
-> ssessment 2023/Data/HIES 2010/BGD_2010_HIES_v01_M_v07_A_SARMD_LBR"
-.                 global INC "C:/Users/wb553773/OneDrive - WBG/BD/BGD Poverty A
-> ssessment 2023/Data/HIES 2010/BGD_2010_HIES_v01_M_v07_A_SARMD_INC"
-.                 global IND "C:/Users/wb553773/OneDrive - WBG/BD/BGD Poverty A
-> ssessment 2023/Data/HIES 2010/BGD_2010_HIES_v01_M_v07_A_SARMD_IND"
-.         }
-. 
-.         *====================================================================
-> =======
-.         * Load modules and merge modules
-.         *====================================================================
-> =======
-.         use "$LBR", clear
-. 
-.         keep pid industrycat10_year industrycat10_2_year ocusec_year ocusec_2
-> _year occup_year occup_2_year empstat_year empstat_2_year lstatus_year
-. 
-.         tempfile labor
-. 
-.         save `labor'
-file /var/folders/fc/5g_0xpf55dz7bg775xzr1vfw0000gp/T//St45878.000002 saved
-    as .dta format
-. 
-.         use "$INC", clear
-. 
-.         keep pid ip ila inla ii ipcf inp ijubi itranp itrane icap inla_otro r
-> enta_imp itf
-. 
-.         tempfile income
-. 
-.         save `income'
-file /var/folders/fc/5g_0xpf55dz7bg775xzr1vfw0000gp/T//St45878.000003 saved
-    as .dta format
-. 
-.         use "$IND", clear
-. 
-.         merge m:1 pid using `income', nogen
-
-    Result                      Number of obs
-    -----------------------------------------
-    Not matched                             0
-    Matched                            61,849  
-    -----------------------------------------
-. 
-.         merge m:1 pid using `labor'
-
-    Result                      Number of obs
-    -----------------------------------------
-    Not matched                             0
-    Matched                            61,849  (_merge==3)
-    -----------------------------------------
-. 
-.         drop if _merge==2
-(0 observations deleted)
-.         drop _merge
-. 
-.         * Rename labels
-.         cap lab def industrycat10_year 1 "Agriculture, Hunting, Fishing, etc.
-> " 2 "Mining" 3 "Manufacturing"  4 "Public Utility Services"  5 "Construction"
->   6 "Commerce" 7 "Transport and Communications" 8 "Financial and Business Ser
-> vices"  9 "Public Administration"  10 "Others Services, Unspecified", replace
-.         cap lab val industrycat10_year industrycat10_year
-. 
-.         cap lab def industrycat10_2_year 1 "Agriculture, Hunting, Fishing, et
-> c." 2 "Mining" 3 "Manufacturing"  4 "Public Utility Services"  5 "Constructio
-> n"  6 "Commerce" 7 "Transport and Communications" 8 "Financial and Business S
-> ervices"  9 "Public Administration"  10 "Others Services, Unspecified", repla
-> ce
-.         cap lab val industrycat10_2_year industrycat10_2_year
-. 
-.         cap lab def ocusec_year 1 "Public sector, Central Government, Army" 2
->  "Private, NGO" 3 "State owned" 4 "Public or State-owned, but cannot distingu
-> ish", replace
-.         cap lab val ocusec_year ocusec_year
-. 
-.         cap lab def ocusec_2_year 1 "Public sector, Central Government, Army"
->  2 "Private, NGO" 3 "State owned" 4 "Public or State-owned, but cannot distin
-> guish", replace
-.         cap lab val ocusec_2_year ocusec_2_year
-. 
-.         cap lab def occup_year 1 "Managers"  2  "Professionals"  3  "Technici
-> ans and associate professionals"  4  "Clerical support workers"  5 "Service a
-> nd sales workers" 6 "Skilled agricultural, forestry and fishery workers" 7  "
-> Craft and related trades workers" 8  "Plant and machine operators, and assemb
-> lers" 9 "Elementary occupations" 10  "Armed forces occupations" 99 "Other/uns
-> pecified", replace
-.         cap lab val occup_year occup_year
-. 
-.         cap lab def occup_2_year 1 "Managers"  2  "Professionals"  3  "Techni
-> cians and associate professionals"  4  "Clerical support workers"  5 "Service
->  and sales workers" 6 "Skilled agricultural, forestry and fishery workers" 7 
->  "Craft and related trades workers" 8  "Plant and machine operators, and asse
-> mblers" 9 "Elementary occupations" 10  "Armed forces occupations" 99 "Other/u
-> nspecified", replace
-.         cap lab val occup_2_year occup_2_year
-. 
-.         cap lab def empstat_year 1 "Paid Employee"  2 "Non-Paid Employee"  3 
-> "Employer"  4 "Self-employed" 5 "Other, workers not classifiable by status", 
-> replace
-.         cap lab val empstat_year empstat_year
-. 
-.         cap lab def empstat_2_year 1 "Paid Employee"  2 "Non-Paid Employee"  
-> 3 "Employer"  4 "Self-employed" 5 "Other, workers not classifiable by status"
-> , replace
-.         cap lab val empstat_2_year empstat_2_year
-. 
-.         cap lab def lstatus_year 1 "Employed"  2 "Unemployed"  3 "Not in labo
-> r force", replace
-.         cap lab val lstatus_year lstatus_year
-. 
-.         cap lab def lstatus 1 "Employed"  2 "Unemployed"  3 "Not in labor for
-> ce", replace
-.         cap lab val lstatus lstatus
-. 
-.         * Recode industry variable to match macro aggregation
-.         clonevar industry6=industrycat10_year
-(42,043 missing values generated)
-.         recode industry6 (3=2) (4=2) (5=3) (6=4) (7=5) (8=6) (9=4) (10=4)
-(13,474 changes made to industry6)
-.         cap lab def industry6 1 "Agriculture" 2 "Industry" 3 "Construction"  
-> 4 "Services" 5 "Transport" 6 "Finance", replace
-.         cap lab val industry6 industry6
-. 
-.         clonevar industry6_2=industrycat10_2_year
-(54,704 missing values generated)
-.         recode industry6_2 (3=2) (4=2) (5=3) (6=4) (7=5) (8=6) (9=4) (10=4)
-(822 changes made to industry6_2)
-.         cap lab def industry6_2 1 "Agriculture" 2 "Industry" 3 "Construction"
->   4 "Services" 5 "Transport" 6 "Finance", replace
-.         cap lab val industry6_2 industry6_2
-. 
-.         * Incorporate IMP module (legacy)
-.         if `year'==2016 {
-.                 destring idh, replace
-.                 clonevar hhold=idh
-.                 merge m:1 hhold using "C:/Users/wb553773/OneDrive - WBG/BD/BG
-> D Poverty Assessment 2023/Data/HIES 2016/BGD_2016_HIES_v01_M_v06_A_SARMD_IND_
-> imp", keepusing(index)
-.         }
-. 
-.         * Incorporate IMP module (legacy)
-.         if `year'==2010 {
-.                 destring idh, replace
-.                 clonevar hhold=idh
-.                 merge m:1 hhold using "C:/Users/wb553773/OneDrive - WBG/BD/BG
-> D Poverty Assessment 2023/Data/HIES 2010/BGD_2010_HIES_v01_M_v06_A_SARMD_IND_
-> imp", keepusing(index10)
-.         }
-. 
-. 
-.         * Incorporate povextline (needs to be updated)
-.         if `year'==2022 & "`c(username)'"=="WB553773" {
-.                 *merge with updated welfare (consumption)
-.                 gen hhidseq = substr(hhid, strpos(hhid, "-") + 1, .)
-.                 destring hhidseq , replace
-.                 gen hhold = psu*1000+hhidseq
-.                 merge m:1 hhold using "C:/Users/wb553773/OneDrive - WBG/BD/HI
-> ES2022/HIES2022_HH_08_16_23.dta", keepusing(p_cons2 zu_cbn zl_cbn domain16)
-.                 *keep if _merge==3
-.                 *drop _merge
-.                 drop welfarenom
-.                 rename p_cons2 welfarenom
-.                 rename zl_cbn povextline
-.                 rename zu_cbn povline
-.         }
-.         
-.         * Tabulations
-.         tab industry6 [iw=wgt]
-
-     1 digit |
-    industry |
-classificati |
- on, primary |
- job (12-mon |
- ref period) |      Freq.     Percent        Cum.
--------------+-----------------------------------
- Agriculture | 18741136.9       34.69       34.69
-    Industry | 12746207.4       23.59       58.28
-Construction |  3,990,739        7.39       65.66
-    Services |  6,621,872       12.26       77.92
-   Transport |  4,762,682        8.81       86.73
-     Finance |  7,169,383       13.27      100.00
--------------+-----------------------------------
-       Total | 54032020.2      100.00
-. 
-.         if `year'==2016 {
-.                 replace ila = ila * index
-.                 replace ip = ip*index
-.         }
-. 
-.         if `year'==2010 {
-.                 replace ila = ila * index10
-.                 replace ip = ip*index10
-.         }
-. 
-.         tabstat ila ip [aw=wgt], by(industry6)
-
-Summary statistics: Mean
-Group variable: industry6 (1 digit industry classification, primary job (12-mon
->  ref period))
-
-   industry6 |       ila        ip
--------------+--------------------
- Agriculture |  11291.06  10309.05
-    Industry |  21708.76  21309.71
-Construction |  21621.01  20928.24
-    Services |  24798.35  23894.63
-   Transport |   17893.5  17303.95
-     Finance |  39397.65   38679.1
--------------+--------------------
-       Total |   20503.6  19758.24
-----------------------------------
-. 
-.         tab lstatus [iw=wgt]
-
-Labor Force Status |      Freq.     Percent        Cum.
--------------------+-----------------------------------
-          Employed | 50924430.5       33.92       33.92
-        Unemployed |  3,040,037        2.03       35.95
-Not in labor force | 96157079.9       64.05      100.00
--------------------+-----------------------------------
-             Total |150,121,548      100.00
-. 
-.         tab lstatus_year [iw=wgt]
-
-      Labor status |
-       (12-mon ref |
-           period) |      Freq.     Percent        Cum.
--------------------+-----------------------------------
-          Employed | 53534601.9      100.00      100.00
--------------------+-----------------------------------
-             Total | 53534601.9      100.00
-. 
-.         gen workage=0
-.         replace workage=1 if age>=15 & age<=64
-(40,644 real changes made)
-.         tab workage [iw=wgt]
-
-    workage |      Freq.     Percent        Cum.
-------------+-----------------------------------
-          0 | 56837988.2       34.30       34.30
-          1 |108,849,193       65.70      100.00
-------------+-----------------------------------
-      Total |165,687,181      100.00
-.         
-. }
-
-. *============================================================================
-> ===
-. 
-end of do-file
 . 
 .         drop cpi2017
 .         merge m:1 countrycode year using `dlwcpi'
-
-    Result                      Number of obs
-    -----------------------------------------
-    Not matched                             0
-    Matched                            61,849  (_merge==3)
-    -----------------------------------------
 .         keep if _merge==3
-(0 observations deleted)
 .         drop _merge
-.         save "$data/BGD_2022_HIES_v02_M_v02_A_SARMD_SIM.dta", replace
-(file /Users/Israel/OneDrive/WBG/ETIRI/Projects/FY24/FY24 5 SAS -
-    Bangladesh/main/BGD-MPO-Microsimulation/2024SM/Data/BGD_2022_HIES_v02_M_v
-    > 02_A_SARMD_SIM.dta not found)
-file /Users/Israel/OneDrive/WBG/ETIRI/Projects/FY24/FY24 5 SAS -
-    Bangladesh/main/BGD-MPO-Microsimulation/2024SM/Data/BGD_2022_HIES_v02_M_v
-    > 02_A_SARMD_SIM.dta saved
+.         save "$data_root/BGD_2022_HIES_v02_M_v02_A_SARMD_SIM.dta", replace
 . }
 
 . *===========================================================================
 . * run dofiles
 . *===========================================================================
-. {
+. if "`runsim'"=="yes" {
 . 
 .         forval yyyy = `iniyear'/`finyear' {
   2.                 clear all
@@ -636,8 +318,8 @@ file /Users/Israel/OneDrive/WBG/ETIRI/Projects/FY24/FY24 5 SAS -
  10.                 }
  11. 
 .                 * Use base household survey
-.                 if ${year}==2022 use "$data/BGD_2022_HIES_v02_M_v02_A_SARMD_S
-> IM.dta", clear
+.                 if ${year}==2022 use "$data_root/BGD_2022_HIES_v02_M_v02_A_SA
+> RMD_SIM.dta", clear
  12.                 
 .                 * Globals for reading scenarios
 .                 gl inputs   "$data_in/Macro and elasticities/Inputs elasticit
@@ -676,20 +358,20 @@ file /Users/Israel/OneDrive/WBG/ETIRI/Projects/FY24/FY24 5 SAS -
 .                 drop if welfarenom==.
  28.                 save "${data_out}/basesim_${model}", replace
  29.         }
-cuantiles.doprog_mata.dozk.domtab1.domatnames.dogini.dotheil.dodesigual.doshare
-> s.doparam_res.dofgt.dosimchoiceres.do
+cuantiles.dodesigual.dofgt.dogini.domatnames.domtab1.doparam_res.doprog_mata.do
+> shares.dosimchoiceres.dotheil.dozk.do
 cuantiles.do
-prog_mata.do
-zk.do
-mtab1.do
-matnames.do
-gini.do
-theil.do
 desigual.do
-shares.do
-param_res.do
 fgt.do
+gini.do
+matnames.do
+mtab1.do
+param_res.do
+prog_mata.do
+shares.do
 simchoiceres.do
+theil.do
+zk.do
 
 . *!v1.0
 . *===========================================================================
@@ -999,7 +681,7 @@ end of do-file
 (61,849 missing values generated)
 
 . replace sect_main6 = 1 if  industry6 == 1 & emplyd == 1 
-(6,167 real changes made)
+(6,168 real changes made)
 
 . replace sect_main6 = 2 if  industry6 == 2 & emplyd == 1 
 (4,141 real changes made)
@@ -1014,7 +696,7 @@ end of do-file
 (1,773 real changes made)
 
 . replace sect_main6 = 6 if  industry6 == 6 & emplyd == 1 
-(2,901 real changes made)
+(2,900 real changes made)
 
 . label var sect_main6 "main economic sector" 
 
@@ -1024,7 +706,7 @@ end of do-file
 (61,849 missing values generated)
 
 . replace sect_secu6 = 1 if  industry6_2 == 1 & emplyd == 1 
-(6,311 real changes made)
+(6,309 real changes made)
 
 . replace sect_secu6 = 2 if  industry6_2 == 2 & emplyd == 1 
 (202 real changes made)
@@ -1033,13 +715,13 @@ end of do-file
 (100 real changes made)
 
 . replace sect_secu6 = 4 if  industry6_2 == 4 & emplyd == 1 
-(201 real changes made)
+(202 real changes made)
 
 . replace sect_secu6 = 5 if  industry6_2 == 5 & emplyd == 1
 (105 real changes made)
 
 . replace sect_secu6 = 6 if  industry6_2 == 6 & emplyd == 1
-(224 real changes made)
+(225 real changes made)
 
 . label var sect_secu6  "secondary economic sector" 
 
@@ -1077,10 +759,10 @@ end of do-file
 . 
 . * primary activity
 . gen     labor_rel = 1 if salaried == 1
-(50,117 missing values generated)
+(50,118 missing values generated)
 
 . replace labor_rel = 2 if self_emp == 1
-(7,672 real changes made)
+(7,673 real changes made)
 
 . replace labor_rel = 3 if unpaid   == 1
 (0 real changes made)
@@ -1093,10 +775,10 @@ end of do-file
 . 
 . * secondary activity
 . gen     labor_rel2 = 1 if salaried2 == 1
-(61,034 missing values generated)
+(61,033 missing values generated)
 
 . replace labor_rel2 = 2 if self_emp2 == 1
-(6,280 real changes made)
+(6,279 real changes made)
 
 . replace labor_rel2 = 3 if unpaid2   == 1
 (0 real changes made)
@@ -1372,7 +1054,7 @@ end of do-file
 (1,204 real changes made)
 
 . replace occupation = 2 if  sect_main6 == 1
-(6,142 real changes made)
+(6,143 real changes made)
 
 . replace occupation = 3 if  sect_main6 == 2
 (3,972 real changes made)
@@ -1387,7 +1069,7 @@ end of do-file
 (1,686 real changes made)
 
 . replace occupation = 7 if  sect_main6 == 6
-(2,759 real changes made)
+(2,758 real changes made)
 
 . label var occupation "occupation status"
 
@@ -1828,21 +1510,21 @@ fin          |
 
     Variable |        Obs        Mean    Std. dev.       Min        Max
 -------------+---------------------------------------------------------
-  occupation |     24,254    1.728787    2.346759          0          7
+  occupation |     24,254    1.728581    2.346515          0          7
 
 note: 1.male#1.h_head#1.married omitted because of collinearity.
 note: 1.male#7.educ_level omitted because of collinearity.
-Iteration 0:  Log pseudolikelihood =  -58304969  
-Iteration 1:  Log pseudolikelihood =  -46624857  
-Iteration 2:  Log pseudolikelihood =  -45613734  
-Iteration 3:  Log pseudolikelihood =  -45570619  
-Iteration 4:  Log pseudolikelihood =  -45570481  
-Iteration 5:  Log pseudolikelihood =  -45570481  
+Iteration 0:  Log pseudolikelihood =  -58304892  
+Iteration 1:  Log pseudolikelihood =  -46625126  
+Iteration 2:  Log pseudolikelihood =  -45614124  
+Iteration 3:  Log pseudolikelihood =  -45571012  
+Iteration 4:  Log pseudolikelihood =  -45570874  
+Iteration 5:  Log pseudolikelihood =  -45570874  
 
 Multinomial logistic regression                       Number of obs  =  11,931
-                                                      Wald chi2(140) = 3960.36
+                                                      Wald chi2(140) = 3960.41
                                                       Prob > chi2    =  0.0000
-Log pseudolikelihood = -45570481                      Pseudo R2      =  0.2184
+Log pseudolikelihood = -45570874                      Pseudo R2      =  0.2184
 
 ------------------------------------------------------------------------------
              |               Robust
@@ -1851,270 +1533,270 @@ Log pseudolikelihood = -45570481                      Pseudo R2      =  0.2184
 inactive     |  (base outcome)
 -------------+----------------------------------------------------------------
 unempl       |
-         age |   .2608075   .0780087     3.34   0.001     .1079132    .4137018
+         age |    .260806   .0780079     3.34   0.001     .1079134    .4136987
              |
- c.age#c.age |   -.004176   .0013291    -3.14   0.002    -.0067809   -.0015711
+ c.age#c.age |   -.004176    .001329    -3.14   0.002    -.0067808   -.0015711
              |
-       urban |  -.0918032   .1661002    -0.55   0.580    -.4173536    .2337472
+       urban |  -.0918298   .1660989    -0.55   0.580    -.4173777    .2337181
              |
  male#h_head#|
      married |
-   Male#0#0  |    .499053   .6385527     0.78   0.434    -.7524873    1.750593
-   Male#0#1  |  -.4447238   .6643843    -0.67   0.503    -1.746893    .8574456
-   Male#1#0  |   .2980419   1.014765     0.29   0.769    -1.690861    2.286945
+   Male#0#0  |   .4990563   .6385542     0.78   0.434     -.752487      1.7506
+   Male#0#1  |  -.4447111   .6643863    -0.67   0.503    -1.746884    .8574622
+   Male#1#0  |   .2980912   1.014766     0.29   0.769    -1.690814    2.286997
    Male#1#1  |          0  (omitted)
              |
-  remitt_any |   .3020064   .1530438     1.97   0.048     .0020461    .6019668
-       depen |  -1.670621   .4948621    -3.38   0.001    -2.640533   -.7007093
-     oth_pub |   .2550969   .2257481     1.13   0.258    -.1873612    .6975549
+  remitt_any |    .301997    .153044     1.97   0.048     .0020364    .6019577
+       depen |  -1.670594   .4948618    -3.38   0.001    -2.640505   -.7006829
+     oth_pub |   .2551066   .2257476     1.13   0.258    -.1873506    .6975638
              |
         male#|
   educ_level |
-     Male#4  |  -1.155924   .2183446    -5.29   0.000    -1.583872   -.7279766
-     Male#5  |  -1.061052   .3228742    -3.29   0.001    -1.693874   -.4282302
-     Male#6  |  -.6317258   .4605361    -1.37   0.170     -1.53436    .2709083
+     Male#4  |  -1.155902   .2183426    -5.29   0.000    -1.583846   -.7279586
+     Male#5  |  -1.061038   .3228741    -3.29   0.001    -1.693859   -.4282161
+     Male#6  |  -.6317264   .4605356    -1.37   0.170     -1.53436    .2709069
      Male#7  |          0  (omitted)
              |
-    atschool |  -1.661575   .2054457    -8.09   0.000    -2.064241   -1.258909
+    atschool |  -1.661547   .2054454    -8.09   0.000    -2.064213   -1.258881
              |
       region |
-20-Chitta~g  |  -.2486835   .2674837    -0.93   0.353    -.7729419    .2755749
-   30-Dhaka  |   .0086681   .2489009     0.03   0.972    -.4791686    .4965048
-  40-Khulna  |   -.255249   .2778237    -0.92   0.358    -.7997734    .2892754
-45-Mymens~h  |  -.0514407   .2806239    -0.18   0.855    -.6014533     .498572
-50-Rajshahi  |     -.3132   .3039905    -1.03   0.303    -.9090105    .2826105
- 55-Rangpur  |  -.2578209   .2829982    -0.91   0.362    -.8124871    .2968453
-  60-Sylhet  |  -.1514643   .2881171    -0.53   0.599    -.7161635    .4132348
+20-Chitta~g  |  -.2486832   .2674837    -0.93   0.353    -.7729416    .2755752
+   30-Dhaka  |   .0086682   .2489009     0.03   0.972    -.4791686     .496505
+  40-Khulna  |  -.2552513   .2778237    -0.92   0.358    -.7997758    .2892732
+45-Mymens~h  |  -.0514433    .280624    -0.18   0.855    -.6014561    .4985696
+50-Rajshahi  |  -.3131958   .3039905    -1.03   0.303    -.9090063    .2826146
+ 55-Rangpur  |  -.2578165   .2829979    -0.91   0.362    -.8124822    .2968493
+  60-Sylhet  |  -.1515398   .2881168    -0.53   0.599    -.7162383    .4131587
              |
-       _cons |  -4.375384   1.049212    -4.17   0.000    -6.431801   -2.318967
+       _cons |  -4.375395   1.049209    -4.17   0.000    -6.431806   -2.318984
 -------------+----------------------------------------------------------------
 agric        |
-         age |   .2290685   .0292469     7.83   0.000     .1717457    .2863913
+         age |   .2289705   .0292422     7.83   0.000     .1716569    .2862841
              |
- c.age#c.age |  -.0031008   .0003572    -8.68   0.000    -.0038008   -.0024007
+ c.age#c.age |  -.0030998   .0003571    -8.68   0.000    -.0037997   -.0023999
              |
-       urban |  -1.496539   .1061581   -14.10   0.000    -1.704605   -1.288473
+       urban |  -1.495609    .106127   -14.09   0.000    -1.703614   -1.287604
              |
  male#h_head#|
      married |
-   Male#0#0  |  -2.829836   .2146924   -13.18   0.000    -3.250626   -2.409047
-   Male#0#1  |  -2.312986   .1766007   -13.10   0.000    -2.659117   -1.966855
-   Male#1#0  |  -.1570805   .4115387    -0.38   0.703    -.9636815    .6495205
+   Male#0#0  |  -2.829728   .2146688   -13.18   0.000    -3.250471   -2.408985
+   Male#0#1  |   -2.31318   .1766009   -13.10   0.000    -2.659311   -1.967048
+   Male#1#0  |  -.1575308   .4115243    -0.38   0.702    -.9641036    .6490421
    Male#1#1  |          0  (omitted)
              |
-  remitt_any |    .152792   .0952173     1.60   0.109    -.0338304    .3394145
-       depen |   .3083922   .2695455     1.14   0.253    -.2199072    .8366917
-     oth_pub |  -.5524285   .2002302    -2.76   0.006    -.9448724   -.1599846
+  remitt_any |   .1530503   .0952041     1.61   0.108    -.0335462    .3396469
+       depen |   .3077136   .2695178     1.14   0.254    -.2205317    .8359588
+     oth_pub |  -.5526217   .2002189    -2.76   0.006    -.9450436   -.1601999
              |
         male#|
   educ_level |
-     Male#4  |   .4389289   .1400788     3.13   0.002     .1643795    .7134782
-     Male#5  |   .1492774   .1878902     0.79   0.427    -.2189806    .5175354
-     Male#6  |   1.267135   .3506802     3.61   0.000     .5798142    1.954455
+     Male#4  |   .4389481   .1400719     3.13   0.002     .1644123    .7134839
+     Male#5  |   .1491332    .187878     0.79   0.427     -.219101    .5173674
+     Male#6  |   1.267271   .3506839     3.61   0.000     .5799434    1.954599
      Male#7  |          0  (omitted)
              |
-    atschool |  -1.838587   .1654992   -11.11   0.000     -2.16296   -1.514215
+    atschool |  -1.839474   .1654646   -11.12   0.000    -2.163779   -1.515169
              |
       region |
-20-Chitta~g  |  -.7299078   .1640703    -4.45   0.000     -1.05148   -.4083359
-   30-Dhaka  |  -1.072992   .1745143    -6.15   0.000    -1.415034   -.7309508
-  40-Khulna  |   .1079624   .1585028     0.68   0.496    -.2026974    .4186222
-45-Mymens~h  |  -.1634131   .1698858    -0.96   0.336    -.4963832    .1695569
-50-Rajshahi  |     .50904    .170146     2.99   0.003     .1755599    .8425201
- 55-Rangpur  |   .0659929   .1592222     0.41   0.679    -.2460769    .3780627
-  60-Sylhet  |  -.1525867   .1774138    -0.86   0.390    -.5003113     .195138
+20-Chitta~g  |  -.7299382   .1640601    -4.45   0.000     -1.05149   -.4083862
+   30-Dhaka  |  -1.073106   .1745063    -6.15   0.000    -1.415132   -.7310796
+  40-Khulna  |   .1079397   .1584959     0.68   0.496    -.2027064    .4185859
+45-Mymens~h  |   -.163435   .1698768    -0.96   0.336    -.4963874    .1695175
+50-Rajshahi  |   .5089773   .1701394     2.99   0.003     .1755102    .8424444
+ 55-Rangpur  |   .0659462   .1592162     0.41   0.679    -.2461118    .3780042
+  60-Sylhet  |  -.1505373   .1773246    -0.85   0.396    -.4980872    .1970125
              |
-       _cons |  -1.636152   .6350049    -2.58   0.010    -2.880739    -.391565
+       _cons |  -1.633939   .6349113    -2.57   0.010    -2.878342   -.3895359
 -------------+----------------------------------------------------------------
 ind          |
-         age |   .2219752    .028197     7.87   0.000     .1667101    .2772403
+         age |   .2219768    .028197     7.87   0.000     .1667117     .277242
              |
  c.age#c.age |  -.0037151   .0003574   -10.39   0.000    -.0044156   -.0030146
              |
-       urban |   .1876561   .0930838     2.02   0.044     .0052152    .3700969
+       urban |   .1876774   .0930822     2.02   0.044     .0052396    .3701151
              |
  male#h_head#|
      married |
-   Male#0#0  |  -2.988645   .2020943   -14.79   0.000    -3.384743   -2.592547
-   Male#0#1  |  -2.356325   .1763776   -13.36   0.000    -2.702018   -2.010631
-   Male#1#0  |  -1.031695   .4035703    -2.56   0.011    -1.822678   -.2407115
+   Male#0#0  |  -2.988631   .2020943   -14.79   0.000    -3.384728   -2.592533
+   Male#0#1  |  -2.356309   .1763782   -13.36   0.000    -2.702004   -2.010614
+   Male#1#0  |   -1.03165   .4035715    -2.56   0.011    -1.822636   -.2406648
    Male#1#1  |          0  (omitted)
              |
-  remitt_any |   .1142369   .0914269     1.25   0.211    -.0649565    .2934303
-       depen |  -.5936973   .2635589    -2.25   0.024    -1.110263   -.0771314
-     oth_pub |  -1.021109    .212028    -4.82   0.000    -1.436677   -.6055421
+  remitt_any |   .1142205    .091427     1.25   0.212    -.0649732    .2934143
+       depen |  -.5936631   .2635593    -2.25   0.024     -1.11023   -.0770963
+     oth_pub |  -1.021104    .212028    -4.82   0.000    -1.436672   -.6055372
              |
         male#|
   educ_level |
-     Male#4  |   .0255108    .128286     0.20   0.842    -.2259251    .2769467
-     Male#5  |   .0331729   .1683594     0.20   0.844    -.2968054    .3631513
-     Male#6  |   .0852646   .5593089     0.15   0.879    -1.010961     1.18149
+     Male#4  |   .0255115    .128286     0.20   0.842    -.2259243    .2769474
+     Male#5  |    .033188   .1683594     0.20   0.844    -.2967904    .3631663
+     Male#6  |   .0852595   .5593089     0.15   0.879    -1.010966    1.181485
      Male#7  |          0  (omitted)
              |
-    atschool |  -2.500981   .1620598   -15.43   0.000    -2.818613    -2.18335
+    atschool |  -2.500961   .1620606   -15.43   0.000    -2.818593   -2.183328
              |
       region |
-20-Chitta~g  |  -.1664012   .1527485    -1.09   0.276    -.4657827    .1329804
-   30-Dhaka  |    .345235   .1488749     2.32   0.020     .0534454    .6370245
-  40-Khulna  |  -.3196153    .171254    -1.87   0.062    -.6552669    .0160363
-45-Mymens~h  |   .2434379   .1689301     1.44   0.150    -.0876591    .5745349
-50-Rajshahi  |   .1995771   .1764043     1.13   0.258     -.146169    .5453232
- 55-Rangpur  |  -.1102568   .1704625    -0.65   0.518     -.444357    .2238435
-  60-Sylhet  |  -.2275736   .1823212    -1.25   0.212    -.5849167    .1297694
+20-Chitta~g  |  -.1663984    .152749    -1.09   0.276    -.4657809     .132984
+   30-Dhaka  |   .3452483   .1488755     2.32   0.020     .0534577    .6370389
+  40-Khulna  |  -.3196168   .1712543    -1.87   0.062    -.6552691    .0160355
+45-Mymens~h  |   .2434386   .1689308     1.44   0.150    -.0876596    .5745369
+50-Rajshahi  |   .1995792   .1764048     1.13   0.258    -.1461678    .5453262
+ 55-Rangpur  |  -.1102548   .1704631    -0.65   0.518    -.4443563    .2238467
+  60-Sylhet  |   -.227604   .1823205    -1.25   0.212    -.5849456    .1297377
              |
-       _cons |   -.510682   .5953442    -0.86   0.391    -1.677535    .6561712
+       _cons |  -.5107565   .5953467    -0.86   0.391    -1.677615    .6561016
 -------------+----------------------------------------------------------------
 cons         |
-         age |   .2008328   .0409376     4.91   0.000     .1205966     .281069
+         age |   .2008273   .0409375     4.91   0.000     .1205913    .2810633
              |
- c.age#c.age |   -.003482   .0005231    -6.66   0.000    -.0045071   -.0024568
+ c.age#c.age |  -.0034819   .0005231    -6.66   0.000    -.0045071   -.0024567
              |
-       urban |   -.066647   .1230793    -0.54   0.588    -.3078779     .174584
+       urban |  -.0666272   .1230772    -0.54   0.588    -.3078541    .1745998
              |
  male#h_head#|
      married |
-   Male#0#0  |  -3.046081   .2605196   -11.69   0.000     -3.55669   -2.535472
-   Male#0#1  |   -2.70022    .216262   -12.49   0.000    -3.124086   -2.276354
-   Male#1#0  |  -1.351252   .5912926    -2.29   0.022    -2.510164   -.1923399
+   Male#0#0  |  -3.046076   .2605191   -11.69   0.000    -3.556684   -2.535468
+   Male#0#1  |  -2.700219   .2162623   -12.49   0.000    -3.124085   -2.276352
+   Male#1#0  |  -1.351224   .5912909    -2.29   0.022    -2.510133   -.1923149
    Male#1#1  |          0  (omitted)
              |
-  remitt_any |   .2737057   .1271684     2.15   0.031     .0244601    .5229512
-       depen |  -.4093871   .3782774    -1.08   0.279    -1.150797     .332023
-     oth_pub |  -1.033735   .4431091    -2.33   0.020    -1.902212   -.1652568
+  remitt_any |   .2737083    .127168     2.15   0.031     .0244637    .5229529
+       depen |  -.4093943   .3782779    -1.08   0.279    -1.150805    .3320168
+     oth_pub |  -1.033736   .4431096    -2.33   0.020    -1.902215   -.1652575
              |
         male#|
   educ_level |
-     Male#4  |    .613673   .2126524     2.89   0.004      .196882    1.030464
-     Male#5  |  -.3706994   .2940974    -1.26   0.208    -.9471197     .205721
-     Male#6  |   1.015094   .6647441     1.53   0.127    -.2877808    2.317968
+     Male#4  |   .6136751   .2126522     2.89   0.004     .1968844    1.030466
+     Male#5  |  -.3706936   .2940971    -1.26   0.208    -.9471134    .2057262
+     Male#6  |   1.015102   .6647447     1.53   0.127    -.2877736    2.317978
      Male#7  |          0  (omitted)
              |
-    atschool |  -3.154238   .2742849   -11.50   0.000    -3.691826   -2.616649
+    atschool |  -3.154256   .2742851   -11.50   0.000    -3.691845   -2.616667
              |
       region |
-20-Chitta~g  |  -.8370111   .2088622    -4.01   0.000    -1.246373   -.4276488
-   30-Dhaka  |  -.7481964   .2085232    -3.59   0.000    -1.156894   -.3394985
-  40-Khulna  |  -.2943956   .2195176    -1.34   0.180    -.7246422    .1358511
-45-Mymens~h  |  -.7096116   .2466864    -2.88   0.004    -1.193108   -.2261152
-50-Rajshahi  |   .2781925   .2221665     1.25   0.211    -.1572457    .7136307
- 55-Rangpur  |  -.3472853   .2258978    -1.54   0.124    -.7900369    .0954662
-  60-Sylhet  |  -.1415155   .2277435    -0.62   0.534    -.5878846    .3048536
+20-Chitta~g  |  -.8370112   .2088626    -4.01   0.000    -1.246374   -.4276481
+   30-Dhaka  |   -.748187   .2085235    -3.59   0.000    -1.156886   -.3394884
+  40-Khulna  |  -.2943992   .2195179    -1.34   0.180    -.7246464    .1358481
+45-Mymens~h  |  -.7096147   .2466868    -2.88   0.004    -1.193112   -.2261175
+50-Rajshahi  |   .2781914   .2221669     1.25   0.211    -.1572478    .7136306
+ 55-Rangpur  |  -.3472856   .2258982    -1.54   0.124    -.7900379    .0954667
+  60-Sylhet  |  -.1414985   .2277421    -0.62   0.534    -.5878648    .3048679
              |
-       _cons |  -1.098768   .8527688    -1.29   0.198    -2.770164    .5726284
+       _cons |  -1.098686   .8527678    -1.29   0.198     -2.77008     .572708
 -------------+----------------------------------------------------------------
 serv         |
-         age |   .2851195   .0305843     9.32   0.000     .2251753    .3450637
+         age |   .2851207   .0305845     9.32   0.000     .2251762    .3450652
              |
  c.age#c.age |  -.0039991   .0003709   -10.78   0.000    -.0047262   -.0032721
              |
-       urban |  -.0332756   .0970914    -0.34   0.732    -.2235712      .15702
+       urban |  -.0332482   .0970901    -0.34   0.732    -.2235412    .1570448
              |
  male#h_head#|
      married |
-   Male#0#0  |  -2.915648   .2081556   -14.01   0.000    -3.323625    -2.50767
-   Male#0#1  |  -2.317595   .1770399   -13.09   0.000    -2.664586   -1.970603
-   Male#1#0  |  -.7132396   .3940278    -1.81   0.070     -1.48552    .0590407
+   Male#0#0  |  -2.915642   .2081557   -14.01   0.000     -3.32362   -2.507665
+   Male#0#1  |  -2.317582   .1770405   -13.09   0.000    -2.664575   -1.970589
+   Male#1#0  |  -.7131991   .3940295    -1.81   0.070    -1.485483    .0590845
    Male#1#1  |          0  (omitted)
              |
-  remitt_any |   .3117342   .0950079     3.28   0.001     .1255221    .4979463
-       depen |  -.6368783   .2813075    -2.26   0.024    -1.188231   -.0855257
-     oth_pub |  -.1182608    .167663    -0.71   0.481    -.4468742    .2103526
+  remitt_any |   .3117181   .0950081     3.28   0.001     .1255056    .4979306
+       depen |   -.636848   .2813082    -2.26   0.024    -1.188202    -.085494
+     oth_pub |  -.1182526   .1676629    -0.71   0.481    -.4468658    .2103607
              |
         male#|
   educ_level |
-     Male#4  |  -1.335465   .1245122   -10.73   0.000    -1.579504   -1.091425
-     Male#5  |  -.6794171   .1626763    -4.18   0.000    -.9982568   -.3605775
-     Male#6  |  -.6099222   .6022924    -1.01   0.311    -1.790394    .5705492
+     Male#4  |  -1.335454   .1245121   -10.73   0.000    -1.579493   -1.091415
+     Male#5  |  -.6793982   .1626766    -4.18   0.000    -.9982384    -.360558
+     Male#6  |  -.6099248   .6022919    -1.01   0.311    -1.790395    .5705456
      Male#7  |          0  (omitted)
              |
-    atschool |  -2.318217   .1764633   -13.14   0.000    -2.664078   -1.972355
+    atschool |  -2.318181   .1764647   -13.14   0.000    -2.664046   -1.972317
              |
       region |
-20-Chitta~g  |  -.4296423   .1582139    -2.72   0.007    -.7397359   -.1195487
-   30-Dhaka  |    -.73025   .1611616    -4.53   0.000    -1.046121    -.414379
-  40-Khulna  |  -.2202754   .1623538    -1.36   0.175     -.538483    .0979322
-45-Mymens~h  |  -.3080525   .1730218    -1.78   0.075     -.647169    .0310639
-50-Rajshahi  |  -.0612623   .1701857    -0.36   0.719    -.3948202    .2722956
- 55-Rangpur  |  -.3737104   .1697719    -2.20   0.028    -.7064572   -.0409635
-  60-Sylhet  |   .2979736    .170546     1.75   0.081    -.0362905    .6322376
+20-Chitta~g  |  -.4296334   .1582141    -2.72   0.007    -.7397272   -.1195395
+   30-Dhaka  |  -.7302207   .1611618    -4.53   0.000    -1.046092   -.4143494
+  40-Khulna  |  -.2202742   .1623537    -1.36   0.175    -.5384817    .0979333
+45-Mymens~h  |  -.3080482   .1730221    -1.78   0.075    -.6471652    .0310689
+50-Rajshahi  |  -.0612635   .1701858    -0.36   0.719    -.3948215    .2722944
+ 55-Rangpur  |  -.3737103    .169772    -2.20   0.028    -.7064572   -.0409634
+  60-Sylhet  |   .2978901   .1705451     1.75   0.081    -.0363721    .6321523
              |
-       _cons |  -1.311954   .6488752    -2.02   0.043    -2.583726   -.0401817
+       _cons |  -1.312025   .6488787    -2.02   0.043    -2.583804   -.0402465
 -------------+----------------------------------------------------------------
 transp       |
-         age |   .3089124   .0430012     7.18   0.000     .2246315    .3931932
+         age |   .3089097   .0430013     7.18   0.000     .2246288    .3931906
              |
- c.age#c.age |  -.0049344   .0005528    -8.93   0.000     -.006018   -.0038508
+ c.age#c.age |  -.0049344   .0005528    -8.93   0.000    -.0060179   -.0038508
              |
-       urban |   .0334775   .1275103     0.26   0.793    -.2164382    .2833932
+       urban |     .03351   .1275084     0.26   0.793    -.2164018    .2834218
              |
  male#h_head#|
      married |
-   Male#0#0  |  -3.410841    .276444   -12.34   0.000    -3.952661   -2.869021
-   Male#0#1  |   -2.85551   .2095075   -13.63   0.000    -3.266137   -2.444883
-   Male#1#0  |  -1.446101   .6501222    -2.22   0.026    -2.720317   -.1718847
+   Male#0#0  |  -3.410829   .2764432   -12.34   0.000    -3.952648    -2.86901
+   Male#0#1  |  -2.855501   .2095078   -13.63   0.000    -3.266129   -2.444874
+   Male#1#0  |  -1.446072   .6501252    -2.22   0.026    -2.720294   -.1718501
    Male#1#1  |          0  (omitted)
              |
-  remitt_any |   .4168534   .1300254     3.21   0.001     .1620084    .6716985
-       depen |  -.4102254   .3687432    -1.11   0.266    -1.132949     .312498
-     oth_pub |  -1.107896   .3781682    -2.93   0.003    -1.849092   -.3666995
+  remitt_any |   .4168485   .1300249     3.21   0.001     .1620044    .6716926
+       depen |   -.410227   .3687429    -1.11   0.266     -1.13295    .3124958
+     oth_pub |  -1.107897   .3781673    -2.93   0.003    -1.849092   -.3667031
              |
         male#|
   educ_level |
-     Male#4  |   1.166294   .2413493     4.83   0.000     .6932577     1.63933
-     Male#5  |   .3309156   .3114616     1.06   0.288     -.279538    .9413691
-     Male#6  |   1.922472   1.076688     1.79   0.074     -.187797    4.032741
+     Male#4  |   1.166292   .2413492     4.83   0.000     .6932566    1.639328
+     Male#5  |   .3309267   .3114616     1.06   0.288    -.2795268    .9413802
+     Male#6  |   1.922474   1.076688     1.79   0.074    -.1877951    4.032743
      Male#7  |          0  (omitted)
              |
-    atschool |  -3.050437   .3575429    -8.53   0.000    -3.751209   -2.349666
+    atschool |  -3.050442   .3575435    -8.53   0.000    -3.751215    -2.34967
              |
       region |
-20-Chitta~g  |  -.4899181   .2138117    -2.29   0.022    -.9089814   -.0708547
-   30-Dhaka  |  -.4987179   .2072744    -2.41   0.016    -.9049682   -.0924675
-  40-Khulna  |  -.1922228   .2213905    -0.87   0.385    -.6261402    .2416945
-45-Mymens~h  |  -.3795641   .2372457    -1.60   0.110    -.8445572    .0854289
-50-Rajshahi  |   .1323117   .2304579     0.57   0.566    -.3193775    .5840009
- 55-Rangpur  |  -.7240289   .2437011    -2.97   0.003    -1.201674   -.2463835
-  60-Sylhet  |  -.3804602   .2471193    -1.54   0.124     -.864805    .1038847
+20-Chitta~g  |  -.4899149    .213812    -2.29   0.022    -.9089789    -.070851
+   30-Dhaka  |  -.4987021   .2072748    -2.41   0.016    -.9049533   -.0924509
+  40-Khulna  |  -.1922243   .2213907    -0.87   0.385    -.6261421    .2416935
+45-Mymens~h  |   -.379564   .2372461    -1.60   0.110    -.8445579    .0854299
+50-Rajshahi  |   .1323111   .2304581     0.57   0.566    -.3193786    .5840008
+ 55-Rangpur  |  -.7240279   .2437016    -2.97   0.003    -1.201674   -.2463815
+  60-Sylhet  |  -.3804477    .247118    -1.54   0.124    -.8647901    .1038946
              |
-       _cons |  -3.465614   .8839081    -3.92   0.000    -5.198042   -1.733186
+       _cons |  -3.465597   .8839098    -3.92   0.000    -5.198028   -1.733165
 -------------+----------------------------------------------------------------
 fin          |
-         age |    .336245   .0311204    10.80   0.000     .2752501    .3972399
+         age |    .336403   .0311278    10.81   0.000     .2753937    .3974123
              |
- c.age#c.age |  -.0046617   .0003891   -11.98   0.000    -.0054242   -.0038991
+ c.age#c.age |  -.0046634   .0003892   -11.98   0.000    -.0054261   -.0039006
              |
-       urban |   .0877608     .09754     0.90   0.368    -.1034141    .2789357
+       urban |   .0873679   .0975449     0.90   0.370    -.1038166    .2785525
              |
  male#h_head#|
      married |
-   Male#0#0  |   -2.61757   .2069982   -12.65   0.000    -3.023279   -2.211861
-   Male#0#1  |  -2.217781   .1794558   -12.36   0.000    -2.569508   -1.866054
-   Male#1#0  |  -.4819689   .3971445    -1.21   0.225    -1.260358      .29642
+   Male#0#0  |   -2.61761   .2070182   -12.64   0.000    -3.023358   -2.211862
+   Male#0#1  |  -2.217561   .1794542   -12.36   0.000    -2.569285   -1.865837
+   Male#1#0  |  -.4815576   .3971499    -1.21   0.225    -1.259957    .2968418
    Male#1#1  |          0  (omitted)
              |
-  remitt_any |   .0796324   .1006338     0.79   0.429    -.1176063    .2768711
-       depen |  -.0520641   .2816007    -0.18   0.853    -.6039914    .4998632
-     oth_pub |  -.6319028   .2012124    -3.14   0.002    -1.026272   -.2375338
+  remitt_any |   .0792963   .1006493     0.79   0.431    -.1179728    .2765653
+       depen |  -.0515022   .2816267    -0.18   0.855    -.6034804    .5004761
+     oth_pub |  -.6317471   .2012206    -3.14   0.002    -1.026132   -.2373619
              |
         male#|
   educ_level |
-     Male#4  |  -.4826364   .1308425    -3.69   0.000    -.7390831   -.2261897
-     Male#5  |  -.2550649   .1748041    -1.46   0.145    -.5976746    .0875448
-     Male#6  |  -.2587137   .6563408    -0.39   0.693    -1.545118    1.027691
+     Male#4  |  -.4827202   .1308493    -3.69   0.000    -.7391802   -.2262602
+     Male#5  |  -.2548981   .1748116    -1.46   0.145    -.5975226    .0877264
+     Male#6  |  -.2588059   .6563376    -0.39   0.693    -1.545204    1.027592
      Male#7  |          0  (omitted)
              |
-    atschool |  -1.824751   .1933541    -9.44   0.000    -2.203718   -1.445784
+    atschool |  -1.823714    .193394    -9.43   0.000    -2.202759   -1.444668
              |
       region |
-20-Chitta~g  |  -.3438064   .1735694    -1.98   0.048    -.6839961   -.0036166
-   30-Dhaka  |   .0311913    .164914     0.19   0.850    -.2920342    .3544168
-  40-Khulna  |    .411383   .1704003     2.41   0.016     .0774045    .7453614
-45-Mymens~h  |   .2277747   .1782997     1.28   0.201    -.1216863    .5772358
-50-Rajshahi  |   .3162842   .1837842     1.72   0.085    -.0439262    .6764945
- 55-Rangpur  |   .0059625   .1830134     0.03   0.974    -.3527372    .3646622
-  60-Sylhet  |   .4757734   .1807021     2.63   0.008     .1216037    .8299431
+20-Chitta~g  |  -.3437296    .173574    -1.98   0.048    -.6839283   -.0035308
+   30-Dhaka  |   .0313535   .1649175     0.19   0.849     -.291879    .3545859
+  40-Khulna  |   .4114125   .1704034     2.41   0.016     .0774279    .7453971
+45-Mymens~h  |   .2278287   .1783046     1.28   0.201    -.1216419    .5772993
+50-Rajshahi  |   .3163253   .1837874     1.72   0.085    -.0438914     .676542
+ 55-Rangpur  |   .0060024   .1830177     0.03   0.974    -.3527058    .3647106
+  60-Sylhet  |   .4734658   .1807865     2.62   0.009     .1191307    .8278009
              |
-       _cons |  -3.477458   .6543745    -5.31   0.000    -4.760009   -2.194908
+       _cons |  -3.480771   .6545108    -5.32   0.000    -4.763588   -2.197953
 ------------------------------------------------------------------------------
 0 1 2 3 4 5 6 7
 
@@ -2239,14 +1921,14 @@ Linear regression                               Number of obs     =      2,417
              |
        _cons |   1.202417   .2723926     4.41   0.000     .6682685    1.736566
 ------------------------------------------------------------------------------
-(sum of wgt is 4,081,257.102356)
+(sum of wgt is 4,081,668.3658142)
 note: 1.male omitted because of collinearity.
 note: 1.male#1.h_head omitted because of collinearity.
 note: 1.male#7.educ_level omitted because of collinearity.
 note: public_job omitted because of collinearity.
 
-Linear regression                               Number of obs     =      1,374
-                                                F(15, 1358)       =       6.40
+Linear regression                               Number of obs     =      1,375
+                                                F(15, 1359)       =       6.41
                                                 Prob > F          =     0.0000
                                                 R-squared         =     0.0553
                                                 Root MSE          =     1.6074
@@ -2255,39 +1937,39 @@ Linear regression                               Number of obs     =      1,374
              |               Robust
     ln_lai_m | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
 -------------+----------------------------------------------------------------
-         age |   .1207688   .0242169     4.99   0.000     .0732623    .1682754
+         age |   .1207269   .0242076     4.99   0.000     .0732386    .1682152
              |
- c.age#c.age |  -.0014249    .000298    -4.78   0.000    -.0020096   -.0008403
+ c.age#c.age |  -.0014245   .0002979    -4.78   0.000     -.002009     -.00084
              |
-       urban |   .0863169    .131849     0.65   0.513    -.1723329    .3449668
+       urban |   .0867514   .1317247     0.66   0.510    -.1716543    .3451571
              |
         male |
        Male  |          0  (omitted)
-    1.h_head |   .0616032   .1242118     0.50   0.620    -.1820647    .3052711
+    1.h_head |   .0616045   .1242097     0.50   0.620    -.1820592    .3052681
              |
  male#h_head |
      Male#1  |          0  (omitted)
              |
         male#|
   educ_level |
-     Male#4  |  -.3081411   .1387067    -2.22   0.026    -.5802437   -.0360384
-     Male#5  |  -.2921211   .2041487    -1.43   0.153    -.6926022      .10836
-     Male#6  |  -.3980472   .4728109    -0.84   0.400    -1.325566    .5294719
+     Male#4  |  -.3080463   .1387102    -2.22   0.027    -.5801555    -.035937
+     Male#5  |  -.2921074   .2041529    -1.43   0.153    -.6925964    .1083816
+     Male#6  |  -.3981919   .4728082    -0.84   0.400    -1.325705    .5293211
      Male#7  |          0  (omitted)
              |
-    salaried |   .3339993   .0867601     3.85   0.000     .1638009    .5041976
+    salaried |    .333875   .0867448     3.85   0.000     .1637068    .5040432
   public_job |          0  (omitted)
              |
       region |
-20-Chitta~g  |   .1882745    .322297     0.58   0.559    -.4439795    .8205285
-   30-Dhaka  |   .3387452   .3452739     0.98   0.327    -.3385829    1.016073
-  40-Khulna  |     .59499   .2994042     1.99   0.047      .007645    1.182335
-45-Mymens~h  |   .2810373   .3146555     0.89   0.372    -.3362262    .8983009
-50-Rajshahi  |   .5282317    .301673     1.75   0.080     -.063564    1.120027
- 55-Rangpur  |   .2336551   .3069582     0.76   0.447    -.3685087    .8358189
-  60-Sylhet  |  -.1170737   .3225094    -0.36   0.717    -.7497445     .515597
+20-Chitta~g  |   .1882091   .3222979     0.58   0.559    -.4440462    .8204644
+   30-Dhaka  |   .3387226   .3452735     0.98   0.327    -.3386043     1.01605
+  40-Khulna  |    .595003    .299402     1.99   0.047     .0076627    1.182343
+45-Mymens~h  |   .2810408   .3146539     0.89   0.372    -.3362193     .898301
+50-Rajshahi  |   .5282031   .3016728     1.75   0.080    -.0635919    1.119998
+ 55-Rangpur  |   .2336719   .3069558     0.76   0.447    -.3684868    .8358306
+  60-Sylhet  |  -.1162098   .3223683    -0.36   0.719    -.7486032    .5161837
              |
-       _cons |  -.8219405   .5031908    -1.63   0.103    -1.809056    .1651751
+       _cons |  -.8211559   .5030464    -1.63   0.103    -1.807987    .1656758
 ------------------------------------------------------------------------------
 (sum of wgt is 3,252,305.9173584)
 note: 1.male omitted because of collinearity.
@@ -2732,55 +2414,55 @@ Linear regression                               Number of obs     =        787
              |
        _cons |   1.145277   .4415353     2.59   0.010     .2785244    2.012029
 ------------------------------------------------------------------------------
-(sum of wgt is 3,640,431.3117371)
+(sum of wgt is 3,640,020.0482788)
 note: 1.male omitted because of collinearity.
 note: 1.male#1.h_head omitted because of collinearity.
 note: 1.male#7.educ_level omitted because of collinearity.
 note: public_job omitted because of collinearity.
 
-Linear regression                               Number of obs     =      1,505
-                                                F(15, 1489)       =      16.57
+Linear regression                               Number of obs     =      1,504
+                                                F(15, 1488)       =      16.52
                                                 Prob > F          =     0.0000
-                                                R-squared         =     0.2574
-                                                Root MSE          =     .95226
+                                                R-squared         =     0.2572
+                                                Root MSE          =     .95228
 
 ------------------------------------------------------------------------------
              |               Robust
     ln_lai_m | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
 -------------+----------------------------------------------------------------
-         age |     .05345    .020019     2.67   0.008     .0141815    .0927185
+         age |   .0533365   .0200298     2.66   0.008      .014047    .0926261
              |
- c.age#c.age |  -.0004932   .0002489    -1.98   0.048    -.0009814   -5.06e-06
+ c.age#c.age |  -.0004919    .000249    -1.98   0.048    -.0009803   -3.58e-06
              |
-       urban |   .2392265   .0657403     3.64   0.000     .1102731    .3681798
+       urban |   .2395568   .0657632     3.64   0.000     .1105583    .3685552
              |
         male |
        Male  |          0  (omitted)
-    1.h_head |   .0736162   .0780217     0.94   0.346     -.079428    .2266605
+    1.h_head |   .0737281   .0780253     0.94   0.345    -.0793231    .2267793
              |
  male#h_head |
      Male#1  |          0  (omitted)
              |
         male#|
   educ_level |
-     Male#4  |  -.6965847   .0840174    -8.29   0.000    -.8613898   -.5317796
-     Male#5  |  -.4369043   .1236969    -3.53   0.000    -.6795429   -.1942657
-     Male#6  |  -.4726184   .3708731    -1.27   0.203    -1.200108    .2548709
+     Male#4  |  -.6963895   .0840227    -8.29   0.000    -.8612049    -.531574
+     Male#5  |   -.436879   .1236979    -3.53   0.000    -.6795197   -.1942383
+     Male#6  |  -.4729443   .3707566    -1.28   0.202    -1.200205    .2543168
      Male#7  |          0  (omitted)
              |
-    salaried |   .0161068   .0746086     0.22   0.829    -.1302423    .1624559
+    salaried |   .0162295   .0746093     0.22   0.828    -.1301211    .1625801
   public_job |          0  (omitted)
              |
       region |
-20-Chitta~g  |  -.0108851   .1183609    -0.09   0.927    -.2430569    .2212867
-   30-Dhaka  |   .4106003   .1100599     3.73   0.000     .1947114    .6264892
-  40-Khulna  |   -.044901   .0945074    -0.48   0.635    -.2302828    .1404808
-45-Mymens~h  |  -.0966041   .1004005    -0.96   0.336    -.2935456    .1003375
-50-Rajshahi  |  -.1038947   .1243235    -0.84   0.403    -.3477624    .1399731
- 55-Rangpur  |  -.4390624     .11504    -3.82   0.000      -.66472   -.2134048
-  60-Sylhet  |  -.3035855   .1020179    -2.98   0.003    -.5036996   -.1034714
+20-Chitta~g  |  -.0109853   .1183623    -0.09   0.926    -.2431599    .2211894
+   30-Dhaka  |     .41048   .1100592     3.73   0.000     .1945923    .6263677
+  40-Khulna  |  -.0449242   .0945069    -0.48   0.635    -.2303052    .1404567
+45-Mymens~h  |  -.0966742   .1003986    -0.96   0.336    -.2936121    .1002636
+50-Rajshahi  |  -.1039476   .1243257    -0.84   0.403    -.3478198    .1399246
+ 55-Rangpur  |  -.4391655   .1150342    -3.82   0.000     -.664812   -.2135191
+  60-Sylhet  |   -.301857   .1020835    -2.96   0.003    -.5020998   -.1016142
              |
-       _cons |   1.651453   .3909805     4.22   0.000     .8845222    2.418384
+       _cons |   1.653433   .3911541     4.23   0.000     .8861606    2.420705
 ------------------------------------------------------------------------------
 
 . 
@@ -3281,7 +2963,7 @@ end of do-file
 
     Variable |        Obs        Mean    Std. dev.       Min        Max
 -------------+---------------------------------------------------------
-     sectorg |     18,214    2.987921    1.789341          1          6
+     sectorg |     18,214    2.987647    1.789263          1          6
 
 . loc lim = r(max)
 
@@ -3328,11 +3010,11 @@ end of do-file
 
     Variable |        Obs        Mean    Std. dev.       Min        Max
 -------------+---------------------------------------------------------
-         wgt |      5,364     2984.04    1644.301   411.2634   8718.561
+         wgt |      5,365    2983.561    1644.522   411.2634   8718.561
 
     Variable |        Obs        Mean    Std. dev.       Min        Max
 -------------+---------------------------------------------------------
-         wgt |      5,364     2984.04    1644.301   411.2634   8718.561
+         wgt |      5,365    2983.561    1644.522   411.2634   8718.561
 
     Variable |        Obs        Mean    Std. dev.       Min        Max
 -------------+---------------------------------------------------------
@@ -3340,11 +3022,11 @@ end of do-file
 
     Variable |        Obs        Mean    Std. dev.       Min        Max
 -------------+---------------------------------------------------------
-      fexp_s |      5,316     3016.02    1657.843        416       8809
+      fexp_s |      5,317    3015.531    1658.071        416       8809
 
     Variable |        Obs        Mean    Std. dev.       Min        Max
 -------------+---------------------------------------------------------
-      fexp_s |      5,316     3016.02    1657.843        416       8809
+      fexp_s |      5,317    3015.531    1658.071        416       8809
 
     Variable |        Obs        Mean    Std. dev.       Min        Max
 -------------+---------------------------------------------------------
@@ -3448,11 +3130,11 @@ end of do-file
 
     Variable |        Obs        Mean    Std. dev.       Min        Max
 -------------+---------------------------------------------------------
-         wgt |      2,584    2473.842    2074.115   411.2634   8718.561
+         wgt |      2,583    2474.641     2074.12   411.2634   8718.561
 
     Variable |        Obs        Mean    Std. dev.       Min        Max
 -------------+---------------------------------------------------------
-         wgt |      2,584    2473.842    2074.115   411.2634   8718.561
+         wgt |      2,583    2474.641     2074.12   411.2634   8718.561
 
     Variable |        Obs        Mean    Std. dev.       Min        Max
 -------------+---------------------------------------------------------
@@ -3460,11 +3142,11 @@ end of do-file
 
     Variable |        Obs        Mean    Std. dev.       Min        Max
 -------------+---------------------------------------------------------
-      fexp_s |      2,573    2499.051    2095.968        416       8809
+      fexp_s |      2,572    2499.861    2095.972        416       8809
 
     Variable |        Obs        Mean    Std. dev.       Min        Max
 -------------+---------------------------------------------------------
-      fexp_s |      2,573    2499.051    2095.968        416       8809
+      fexp_s |      2,572    2499.861    2095.972        416       8809
 
     Variable |        Obs        Mean    Std. dev.       Min        Max
 -------------+---------------------------------------------------------
@@ -3592,7 +3274,7 @@ economic sector 3
 economic sector 6
 (53,975 missing values generated)
 (11,931 real changes made)
-(59,276 missing values generated)
+(59,277 missing values generated)
 (10 real changes made)
 (43,755 missing values generated)
 economic sector 5
@@ -3671,7 +3353,7 @@ SECTORS WHICH INCREASED THEIR EMPLOYMENT LEVELS
 economic sector 1
 (53,975 missing values generated)
 (11,931 real changes made)
-(56,497 missing values generated)
+(56,496 missing values generated)
 (29 real changes made)
 (43,754 missing values generated)
 
@@ -3799,12 +3481,12 @@ there are 3 observations left
 . forvalues s = 1/`lim'   {
   2.         replace act$t = `s' if d_act`s'_sim == 1 &  act$t == .
   3.         }
-(5,345 real changes made)
+(5,346 real changes made)
 (3,770 real changes made)
 (1,544 real changes made)
 (3,262 real changes made)
 (1,608 real changes made)
-(2,563 real changes made)
+(2,562 real changes made)
 
 . drop d_act*
 
@@ -3815,7 +3497,7 @@ there are 3 observations left
 (61,849 missing values generated)
 
 .         replace   sect_main_s =  1 if act$t == 1
-(5,345 real changes made)
+(5,346 real changes made)
 
 .         replace   sect_main_s =  2 if act$t == 2 
 (3,770 real changes made)
@@ -3830,7 +3512,7 @@ there are 3 observations left
 (1,608 real changes made)
 
 .         replace   sect_main_s =  6 if act$t == 6
-(2,563 real changes made)
+(2,562 real changes made)
 
 .         replace   sect_main_s = sectorg if sect_main_s== . & sample == . & em
 > plyd_s == 1
@@ -3857,7 +3539,7 @@ there are 3 observations left
 (1,094 real changes made)
 
 .         replace occupation_s = 2 if  sect_main6_s == 1 & sample == 1
-(5,345 real changes made)
+(5,346 real changes made)
 
 .         replace occupation_s = 3 if  sect_main6_s == 2 & sample == 1
 (3,770 real changes made)
@@ -3872,7 +3554,7 @@ there are 3 observations left
 (1,608 real changes made)
 
 .         replace occupation_s = 7 if  sect_main6_s == 6 & sample == 1
-(2,563 real changes made)
+(2,562 real changes made)
 
 . 
 .         label var    occupation_s "occupation status - simulated"
@@ -3909,11 +3591,11 @@ there are 3 observations left
 
     Variable |        Obs        Mean    Std. dev.       Min        Max
 -------------+---------------------------------------------------------
-         wgt |      5,364     2984.04    1644.301   411.2634   8718.561
+         wgt |      5,365    2983.561    1644.522   411.2634   8718.561
 
     Variable |        Obs        Mean    Std. dev.       Min        Max
 -------------+---------------------------------------------------------
-      fexp_s |      5,345    3005.207    1660.709        416       8809
+      fexp_s |      5,346    3004.723    1660.932        416       8809
 
     Variable |        Obs        Mean    Std. dev.       Min        Max
 -------------+---------------------------------------------------------
@@ -3949,11 +3631,11 @@ there are 3 observations left
 
     Variable |        Obs        Mean    Std. dev.       Min        Max
 -------------+---------------------------------------------------------
-         wgt |      2,584    2473.842    2074.115   411.2634   8718.561
+         wgt |      2,583    2474.641     2074.12   411.2634   8718.561
 
     Variable |        Obs        Mean    Std. dev.       Min        Max
 -------------+---------------------------------------------------------
-      fexp_s |      2,563    2503.086    2098.301        416       8809
+      fexp_s |      2,562    2503.901    2098.305        416       8809
 
 . 
 . mat growth_estru = growth_labor[3..`row_tot',1]
@@ -3967,23 +3649,23 @@ there are 3 observations left
 
 sector[6,2]
            c1         c1
-r1   16006391   16006391
+r1   16006803   16006803
 r2   11790248   11790248
 r3  3856100.1  3856100.1
 r4  7114873.7  7114873.7
 r5    4363133    4363133
-r6  6392407.9  6392407.9
+r6  6391996.6  6391996.6
 
 . mat list sector_s 
 
 sector_s[6,1]
           c1
-r1  16062834
+r1  16063250
 r2  11832819
 r3   3869925
 r4   7136456
 r5   4377857
-r6   6415410
+r6   6414994
 
 . 
 . * including those out of sample
@@ -4029,12 +3711,12 @@ r6   6415410
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
-         aux |  18,214  49523154.1    .3232103   .4677151          0          1
+         aux |  18,214  49523154.1    .3232186   .4677182          0          1
 (43,757 missing values generated)
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
-         aux |  18,092    49695301    .3232264   .4677213          0          1
+         aux |  18,092    49695301    .3232348   .4677244          0          1
 (43,635 missing values generated)
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
@@ -4079,12 +3761,12 @@ r6   6415410
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
-         aux |  18,214  49523154.1    .1290792   .3352968          0          1
+         aux |  18,214  49523154.1    .1290709   .3352876          0          1
 (43,757 missing values generated)
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
-         aux |  18,092    49695301    .1290949   .3353142          0          1
+         aux |  18,092    49695301    .1290865    .335305          0          1
 
 . 
 . drop aux*
@@ -4214,7 +3896,7 @@ end of do-file
 
     Variable |        Obs        Mean    Std. dev.       Min        Max
 -------------+---------------------------------------------------------
-     sectorg |     18,214    2.987921    1.789341          1          6
+     sectorg |     18,214    2.987647    1.789263          1          6
 
 . loc lim = r(max)
 
@@ -4244,11 +3926,11 @@ end of do-file
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
-    salaried |   1,932  5750736.39    .1913663   .3934785          0          1
+    salaried |   1,933  5751147.65    .1913526   .3934677          0          1
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
-  public_job |   1,962  5834381.06           0          0          0          0
+  public_job |   1,963  5834792.32           0          0          0          0
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
@@ -4324,11 +4006,11 @@ end of do-file
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
-    salaried |   1,638  3984048.67    .4253245   .4945431          0          1
+    salaried |   1,637  3983637.41    .4252652   .4945342          0          1
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
-  public_job |   1,647  4007121.27           0          0          0          0
+  public_job |   1,646  4006710.01           0          0          0          0
 
 . 
 . *===========================================================================
@@ -4395,7 +4077,7 @@ end of do-file
         ch_h |      82      212513           1          0          1          1
 (61,849 missing values generated)
 (0 real changes made)
-share of self employment is ===>   ns_2_1  = .80863374
+share of self employment is ===>   ns_2_1  = .80864742
 no observations
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
@@ -4870,7 +4552,7 @@ public_job_ |
 .                 replace lai_m_s = predila_n  if occupation_s == `i' & lai_m_s
 >  == .
   5.         }
-(5,316 real changes made)
+(5,317 real changes made)
 (0 real changes made)
 (0 real changes made)
 (3,766 real changes made)
@@ -4885,7 +4567,7 @@ public_job_ |
 (1,608 real changes made)
 (0 real changes made)
 (0 real changes made)
-(2,563 real changes made)
+(2,562 real changes made)
 (0 real changes made)
 (0 real changes made)
 
@@ -4983,7 +4665,7 @@ end of do-file
 
     Variable |        Obs        Mean    Std. dev.       Min        Max
 -------------+---------------------------------------------------------
-     sectorg |     18,399    2.984564    1.791041          1          6
+     sectorg |     18,399    2.984238    1.791008          1          6
 
 . loc lim = r(max)
 
@@ -5018,19 +4700,19 @@ end of do-file
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
-       lai_m |   4,978  14787277.3    10.14135   94.01069   2.36e-17   5640.807
+       lai_m |   4,979  14787688.5    10.14113   94.00939   2.36e-17   5640.807
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
-     lai_m_s |   4,966    14848054     10.1895   94.31382   2.36e-17   5640.807
+     lai_m_s |   4,967    14848470    10.18928   94.31251   2.36e-17   5640.807
 
 symmetric var0[1,1]
            c1
-r1  10.141346
+r1  10.141134
 
 symmetric var1[1,1]
            c1
-r1  10.189497
+r1  10.189282
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
@@ -5042,12 +4724,12 @@ r1  10.189497
 
 var0[2,1]
            c1
-r1  10.141346
+r1  10.141134
 r2  18.164779
 
 var1[2,1]
            c1
-r1  10.189497
+r1  10.189282
 r2  18.242487
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
@@ -5060,13 +4742,13 @@ r2  18.242487
 
 var0[3,1]
            c1
-r1  10.141346
+r1  10.141134
 r2  18.164779
 r3  17.502815
 
 var1[3,1]
            c1
-r1  10.189497
+r1  10.189282
 r2  18.242487
 r3  17.582694
 
@@ -5080,14 +4762,14 @@ r3  17.582694
 
 var0[4,1]
            c1
-r1  10.141346
+r1  10.141134
 r2  18.164779
 r3  17.502815
 r4   18.08845
 
 var1[4,1]
            c1
-r1  10.189497
+r1  10.189282
 r2  18.242487
 r3  17.582694
 r4  18.129482
@@ -5102,7 +4784,7 @@ r4  18.129482
 
 var0[5,1]
            c1
-r1  10.141346
+r1  10.141134
 r2  18.164779
 r3  17.502815
 r4   18.08845
@@ -5110,7 +4792,7 @@ r5  14.089983
 
 var1[5,1]
            c1
-r1  10.189497
+r1  10.189282
 r2  18.242487
 r3  17.582694
 r4  18.129482
@@ -5118,29 +4800,29 @@ r5  14.122094
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
-       lai_m |   2,568   6351671.9    33.32572    295.715   .0066559   7571.038
+       lai_m |   2,567  6351260.64    33.32772   295.7245   .0066559   7571.038
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
-     lai_m_s |   2,548     6377002    33.46636    296.648   .0066559   7571.038
+     lai_m_s |   2,547     6376586    33.46838   296.6576   .0066559   7571.038
 
 var0[6,1]
            c1
-r1  10.141346
+r1  10.141134
 r2  18.164779
 r3  17.502815
 r4   18.08845
 r5  14.089983
-r6  33.325721
+r6  33.327717
 
 var1[6,1]
            c1
-r1  10.189497
+r1  10.189282
 r2  18.242487
 r3  17.582694
 r4  18.129482
 r5  14.122094
-r6  33.466356
+r6  33.468376
 
 . 
 . 
@@ -5153,7 +4835,7 @@ r6  33.466356
 
     Variable |        Obs        Mean    Std. dev.       Min        Max
 -------------+---------------------------------------------------------
-  sect_main6 |     18,214    2.987921    1.789341          1          6
+  sect_main6 |     18,214    2.987647    1.789263          1          6
 
 . loc lim2 = r(max)
 
@@ -5194,12 +4876,12 @@ r6     0
 
 growth_ila_rel_n[6,1]
             c1
-r1  -.00472553
+r1  -.00472534
 r2  -.00425973
 r3  -.00454307
 r4   -.0022633
 r5  -.00227385
-r6  -.00420228
+r6  -.00420275
 
 . 
 . 
@@ -5214,7 +4896,7 @@ r6  -.00420228
 . //Main
 .    replace lai_m_s = lai_m_s * (1 + growth_ila_rel_n[1,1]) if lai_m_s > 0 & l
 > ai_m_s != .   & sect_main6_s == 1 
-(4,966 real changes made)
+(4,967 real changes made)
 
 .    replace lai_m_s = lai_m_s * (1 + growth_ila_rel_n[2,1]) if lai_m_s > 0 & l
 > ai_m_s != .   & sect_main6_s == 2 
@@ -5234,13 +4916,13 @@ r6  -.00420228
 
 .    replace lai_m_s = lai_m_s * (1 + growth_ila_rel_n[6,1]) if lai_m_s > 0 & l
 > ai_m_s != .   & sect_main6_s == 6 
-(2,548 real changes made)
+(2,547 real changes made)
 
 .  
 . //Secondary 
 .    replace lai_s_s = lai_s_s * (1 + growth_ila_rel_n[1,1]) if lai_s_s > 0 & l
 > ai_s_s != .   & sectorg == 1 
-(1,556 real changes made)
+(1,557 real changes made)
 
 .    replace lai_s_s = lai_s_s * (1 + growth_ila_rel_n[2,1]) if lai_s_s > 0 & l
 > ai_s_s != .   & sectorg == 2 
@@ -5260,7 +4942,7 @@ r6  -.00420228
 
 .    replace lai_s_s = lai_s_s * (1 + growth_ila_rel_n[6,1]) if lai_s_s > 0 & l
 > ai_s_s != .   & sectorg == 6 
-(809 real changes made)
+(808 real changes made)
 
 .   
 . 
@@ -5274,7 +4956,7 @@ r6  -.00420228
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
-     lai_m_s |   4,966    14848054    10.14135   93.86814   2.35e-17   5614.151
+     lai_m_s |   4,967    14848470    10.14113   93.86685   2.35e-17   5614.152
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
@@ -5294,7 +4976,7 @@ r6  -.00420228
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
-     lai_m_s |   2,548     6377002    33.32572   295.4014   .0066279   7539.223
+     lai_m_s |   2,547     6376586    33.32772   295.4108   .0066279   7539.219
 
 . mat n =   scalar(sp2_1)/scalar(sp_1)-1
 
@@ -5317,12 +4999,12 @@ r6  -.00420228
 
 check[6,3]
           rate          c1          c1
-r1           0   1.675e-09  -1.675e-09
+r1           0  -3.196e-09   3.196e-09
 r2           0  -4.280e-09   4.280e-09
 r3           0   7.280e-09  -7.280e-09
 r4           0   1.761e-09  -1.761e-09
 r5           0   5.520e-10  -5.520e-10
-r6           0   3.302e-09  -3.302e-09
+r6           0  -1.961e-10   1.961e-10
 
 . 
 . 
@@ -5342,7 +5024,7 @@ r6           0   3.302e-09  -3.302e-09
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
-     lai_m_s |  17,678    48396930    17.26828   136.8355   2.35e-17   7539.223
+     lai_m_s |  17,678    48396930    17.26828   136.8355   2.35e-17   7539.219
 
 . replace lai_m_s = `tot_ila_s' * (lai_m_s / r(mean)) if sect_main6_s != .
 (18,092 real changes made)
@@ -5402,13 +5084,13 @@ r1   0
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
-     lai_m_s |  17,678    48396930    17.26858   136.8379   2.35e-17   7539.354
+     lai_m_s |  17,678    48396930    17.26858   136.8379   2.35e-17    7539.35
 
 . sca s1 = r(mean)
 
 . 
 . di scalar(s1)/scalar(s0)-1
-4.988e-09
+-1.006e-09
 
 . mat list growth_ila_tot
 
@@ -5436,7 +5118,7 @@ r1   0
 
 . 
 . di scalar(s1)/scalar(s0)-1
-9.021e-11
+-6.140e-10
 
 . mat list growth_ila_tot
 
@@ -5472,7 +5154,7 @@ r1   0
 
     Variable |        Obs        Mean    Std. dev.       Min        Max
 -------------+---------------------------------------------------------
-     sectorg |     18,214    2.987921    1.789341          1          6
+     sectorg |     18,214    2.987647    1.789263          1          6
 
 . loc lim = r(max)
 
@@ -5511,19 +5193,19 @@ r1   0
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
-       lai_m |   4,978  14787277.3    10.14135   94.01069   2.36e-17   5640.807
+       lai_m |   4,979  14787688.5    10.14113   94.00939   2.36e-17   5640.807
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
-       lai_s |   1,556   4640962.9     3.65346   5.056261   .0013866   58.74245
+       lai_s |   1,557  4641374.17    3.653357   5.056048   .0013866   58.74245
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
-     lai_m_s |   4,966    14848054    10.14152   93.86976   2.35e-17   5614.248
+     lai_m_s |   4,967    14848470    10.14131   93.86848   2.35e-17    5614.25
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
-     lai_s_s |   1,556     4688674    3.638215   5.035196   .0013809    58.4973
+     lai_s_s |   1,557     4689090    3.638114   5.034984   .0013809   58.49731
 
 symmetric var0[1,1]
            c1
@@ -5543,7 +5225,7 @@ r1  1.676e+08
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
-     lai_m_s |   3,756    11804083    18.16509   114.8239   .0069038   4690.698
+     lai_m_s |   3,756    11804083     18.1651   114.8239   .0069038   4690.698
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
@@ -5569,7 +5251,7 @@ r2  2.199e+08
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
-     lai_m_s |   1,544     3869925    17.50312   118.3197   .1656434   2893.927
+     lai_m_s |   1,544     3869925    17.50312   118.3197   .1656434   2893.928
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
@@ -5585,7 +5267,7 @@ var1[3,1]
            c1
 r1  1.676e+08
 r2  2.199e+08
-r3   70230069
+r3   70230075
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
@@ -5597,7 +5279,7 @@ r3   70230069
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
-     lai_m_s |   3,257     7121859    18.08876   23.59208   .0691761   440.3061
+     lai_m_s |   3,257     7121859    18.08877   23.59208   .0691761   440.3061
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
@@ -5614,7 +5296,7 @@ var1[4,1]
            c1
 r1  1.676e+08
 r2  2.199e+08
-r3   70230069
+r3   70230075
 r4  1.346e+08
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
@@ -5627,7 +5309,7 @@ r4  1.346e+08
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
-     lai_m_s |   1,607     4376007    14.09023   25.89193   .2767016   622.5786
+     lai_m_s |   1,607     4376007    14.09023   25.89194   .2767016   622.5787
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
@@ -5645,25 +5327,25 @@ var1[5,1]
            c1
 r1  1.676e+08
 r2  2.199e+08
-r3   70230069
+r3   70230075
 r4  1.346e+08
-r5   64540894
+r5   64540900
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
-       lai_m |   2,568   6351671.9    33.32572    295.715   .0066559   7571.038
+       lai_m |   2,567  6351260.64    33.32772   295.7245   .0066559   7571.038
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
-       lai_s |     809  2101331.72     2.47862   4.463423   .0017445   42.38949
+       lai_s |     808  2100920.46    2.478617   4.463863   .0017445   42.38949
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
-     lai_m_s |   2,548     6377002     33.3263   295.4065    .006628   7539.354
+     lai_m_s |   2,547     6376586     33.3283    295.416    .006628    7539.35
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
-     lai_s_s |     809     2122979    2.469564   4.447113   .0017381   42.23478
+     lai_s_s |     808     2122563     2.46956    4.44755   .0017381   42.23476
 
 var0[6,1]
            c1
@@ -5678,9 +5360,9 @@ var1[6,1]
            c1
 r1  1.676e+08
 r2  2.199e+08
-r3   70230069
+r3   70230075
 r4  1.346e+08
-r5   64540894
+r5   64540900
 r6  2.178e+08
 
 . 
@@ -5721,8 +5403,8 @@ r6  2.178e+08
   3.    replace lai_s_s = lai_s_s * (1 + growth_ila_macro_n[`c',1]) if lai_s_s 
 > > 0 & lai_s_s != . & sectorg     == `c' 
   4. }
-(4,966 real changes made)
-(1,556 real changes made)
+(4,967 real changes made)
+(1,557 real changes made)
 (3,756 real changes made)
 (994 real changes made)
 (1,544 real changes made)
@@ -5731,8 +5413,8 @@ r6  2.178e+08
 (911 real changes made)
 (1,607 real changes made)
 (569 real changes made)
-(2,548 real changes made)
-(809 real changes made)
+(2,547 real changes made)
+(808 real changes made)
 
 . 
 . * Check the variations
@@ -5748,11 +5430,11 @@ r6  2.178e+08
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
-     lai_m_s |   4,966    14848054     10.4383   96.61673   2.42e-17   5778.541
+     lai_m_s |   4,967    14848470    10.43808   96.61537   2.42e-17   5778.541
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
-     lai_s_s |   1,556     4688674    3.744683   5.182544   .0014213   60.20913
+     lai_s_s |   1,557     4689090    3.744577   5.182324   .0014213   60.20913
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
@@ -5760,7 +5442,7 @@ r6  2.178e+08
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
-     lai_s_s |     994     2832848    2.113778   5.793858   .0000582   104.5023
+     lai_s_s |     994     2832848    2.113778   5.793857   .0000582   104.5023
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
@@ -5776,7 +5458,7 @@ r6  2.178e+08
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
-     lai_s_s |     911     2034860    3.000643   8.623495   .0003138   161.6951
+     lai_s_s |     911     2034860    3.000642   8.623494   .0003138    161.695
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
@@ -5788,11 +5470,11 @@ r6  2.178e+08
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
-     lai_m_s |   2,548     6377002    34.03695   301.7058   .0067693   7700.124
+     lai_m_s |   2,547     6376586    34.03901   301.7156   .0067693   7700.124
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
-     lai_s_s |     809     2122979    2.522226   4.541944   .0017752    43.1354
+     lai_s_s |     808     2122563    2.522222   4.542392   .0017752    43.1354
 
 . mat n =   scalar(s1_1)/scalar(s0_1)-1
 
@@ -5815,12 +5497,12 @@ r6  2.178e+08
 
 check[6,3]
           rate          c1          c1
-r1   .03371439   .03371439  -1.778e-09
-r2   .08850252   .08850252   7.252e-10
-r3    .0698129   .06981289   6.706e-09
-r4    .0554518   .05545179   1.427e-09
-r5   .05614394   .05614395  -4.537e-09
-r6   .02547885   .02547885   4.893e-10
+r1   .03371439   .03371439   3.819e-09
+r2   .08850252   .08850252   6.501e-09
+r3    .0698129   .06981289   7.287e-09
+r4    .0554518   .05545179   2.207e-09
+r5   .05614394   .05614394  -4.401e-10
+r6   .02547885   .02547886  -6.545e-09
 
 . 
 . 
@@ -5860,7 +5542,7 @@ r6   .02547885   .02547885   4.893e-10
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
-     lai_s_s |   5,757    15668293    2.741043   5.460905   .0000582   161.6951
+     lai_s_s |   5,757    15668293    2.741043   5.460905   .0000582    161.695
 
 . replace lai_s_s = `tot_ila_s' * (lai_s_s/ r(sum))
 (7,003 real changes made)
@@ -5920,7 +5602,7 @@ r1  .06245081
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
-     lai_s_s |   5,757    15668293    2.777956   5.534445    .000059   163.8725
+     lai_s_s |   5,757    15668293    2.777956   5.534444    .000059   163.8725
 
 . sca ss = r(sum)
 
@@ -5928,7 +5610,7 @@ r1  .06245081
 
 . 
 . di scalar(s1)/scalar(s0)-1
-.06245082
+.06245081
 
 . mat list growth_ila_tot
 
@@ -6022,7 +5704,7 @@ end of do-file
 
     Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
 -------------+-----------------------------------------------------------------
-     lai_s_s |   5,757    15668293    2.777956   5.534445    .000059   163.8725
+     lai_s_s |   5,757    15668293    2.777956   5.534444    .000059   163.8725
 
 . sca ss = r(sum)
 
@@ -6034,7 +5716,7 @@ end of do-file
 . mat growth_ila_tot = growth_macro_data[`r',1]
 
 . di scalar(s1)/scalar(s0)-1
-.06245082
+.06245081
 
 . mat list growth_ila_tot
 
@@ -6450,7 +6132,7 @@ Generalized Entropy index GE(2), and Gini coefficient
           |   13.42583     0.59790
 ----------------------------------
 (7 observations deleted)
-file /Users/Israel/OneDrive/WBG/ETIRI/Projects/FY24/FY24 5 SAS -
+file C:/Users/WB308767/OneDrive/WBG/ETIRI/Projects/FY24/FY24 5 SAS -
     Bangladesh/main/BGD-MPO-Microsimulation/2024SM/Data/OUTPUT/basesim_2023.d
     > ta saved
 . }
@@ -6458,7 +6140,7 @@ file /Users/Israel/OneDrive/WBG/ETIRI/Projects/FY24/FY24 5 SAS -
 . *===========================================================================
 . * Display running time  
 . etime
-Elapsed time is 16 seconds 
+Elapsed time is 39 seconds 
 
 . *===========================================================================
 . *                                     END
