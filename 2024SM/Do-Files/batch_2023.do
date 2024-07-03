@@ -26,16 +26,19 @@ etime, start
 * PATHS - Modify according to your local route
 *===============================================================================
 {
-* Main path
+* Main
 	* MacOSX and Unix
 	if (c(os)=="MacOSX"|c(os)=="Unix") & c(username)=="Israel" {
-		 gl path  "/Users/Israel/OneDrive/WBG/ETIRI/Projects/FY24/FY24 5 SAS - Bangladesh/main/BGD-MPO-Microsimulation"
+		 gl main  "/Users/Israel/OneDrive/WBG/ETIRI/Projects/FY24/FY24 5 SAS - Bangladesh/main"
 	}
 	* Windows
 	if c(os)=="Windows" & c(username)=="WB308767" {
 		 gl path  "C:/Users/WB308767/OneDrive - WBG/ETIRI/Projects/FY24/FY24 5 SAS - Bangladesh/main/BGD-MPO-Microsimulation"
 	}
 
+* Path	
+	gl path "$main/BGD-MPO-Microsimulation/2024SM"
+	
 * Do-files path
 	gl thedo     "$path/Do-files" // Do-files path
 
@@ -66,24 +69,26 @@ etime, start
 	local finyear = 2027	// Final year when doing sequential runs
 
 * Parallel run set up
-	* If local parallel is set to "yes". Then n batch files will be created
+	* If *local parallel is set to "yes". Then n batch files will be created
 	* with the name batch_`i'.do located in the working directory.
 	* The iniyear and finyear locals above will be modified.
 
-	local parallel 	""	// If "yes", the program will run in parallel mode
+	*local parallel 	"yes"	// If "yes", the program will run in parallel mode
 	
 		local iniparallelyear = 2022	// First batch file to be created
 		local finparallelyear = 2027	// Last batch file to be created
+		*local parallel_automatic "yes"  // If yes, parallel run will start automatically
+										// Otherwise, call from terminal
 		
 	* Parallel operationalization, do not modify
 	
 		scalar xrxx = 1			// Do not modify
 		scalar xrxy = 1			// Do not modify
-		local _fakeiniyear=xrxx	// Do not modify
-		local _fakefinyear=xrxy	// Do not modify
+		local iniyear=2023	// Do not modify
+		local finyear=2023	// Do not modify
 
 		* Create batch files in MacOSX with sed function
-		if "`parallel'"=="yes" & "`c(os)'"=="MacOSX" {
+		if "`parallel'"=="yes" & (c(os)=="MacOSX"|c(os)=="Unix") {
 			cd "$thedo"
 			
 			* Create myscript.sh
@@ -95,25 +100,29 @@ etime, start
 			forval bi = `iniparallelyear'/`finparallelyear' {
 				
 				* Copy batch file
-				!cp "00_master.do" "batch_`bi'.do"
+				!cp "0 master.do" "batch_`bi'.do"
 				* Replace xrxx and xryy with initial and final years
-				!sed -i '' "s/_fakeiniyear=xrxx/iniyear=`bi'/g" batch_`bi'.do
-				!sed -i '' "s/_fakefinyear=xrxy/finyear=`bi'/g" batch_`bi'.do
+				!sed -i '' "s/iniyear=2023/iniyear=`bi'/g" batch_`bi'.do
+				!sed -i '' "s/finyear=2023/finyear=`bi'/g" batch_`bi'.do
 				* Turn off parallel option
-				!sed -i '' "s/local[[:space:]]parallel/*local parallel/g" batch_`bi'.do
+				!sed -i '' "s/local[[:space:]]parallel/**local parallel/g" batch_`bi'.do
 				
 				* Append line to myscript.sh
-				file write myscript "stata-mp -b do batch_`bi' &" _n
+				file write myscript "/usr/local/bin/stata-mp -b do batch_`bi' &" _n
 			}
 			
 			* Close myscript.sh file
-			file close myscript	
+			file close myscript
+			!chmod u+rx myscript.sh
+			if "`parallel_automatic'"=="yes" {
+				!./myscript.sh
+			}
 			etime
 			exit
 		}
 		
 		* Create batch files in Windows with powershell
-		if "`parallel'"=="yes" & "`c(os)'"=="Windows" {
+		if "`parallel'"=="yes" & c(os)=="Windows" {
 			cd "$thedo"
 			
 			* Create myscript.sh
@@ -125,12 +134,12 @@ etime, start
 			forval bi = `iniparallelyear'/`finparallelyear' {
 								
 				* Copy batch file
-				!copy "00_master.do" "batch_`bi'.do"
+				!copy "0 master.do" "batch_`bi'.do"
 				* Replace _fake xrxx and xryy with initial and final years
-				!powershell -command " (Get-Content batch_`bi'.do) -replace '_fakeiniyear=xrxx', 'iniyear=`bi'' | Out-File -encoding ASCII batch_`bi'.do "
-				!powershell -command " (Get-Content batch_`bi'.do) -replace '_fakefinyear=xrxy', 'finyear=`bi'' | Out-File -encoding ASCII batch_`bi'.do "
+				!powershell -command " (Get-Content batch_`bi'.do) -replace 'iniyear=2023', 'iniyear=`bi'' | Out-File -encoding ASCII batch_`bi'.do "
+				!powershell -command " (Get-Content batch_`bi'.do) -replace 'finyear=2023', 'finyear=`bi'' | Out-File -encoding ASCII batch_`bi'.do "
 				* Turn off parallel option
-				!powershell -command " (Get-Content batch_`bi'.do) -replace 'local parallel', '*local parallel' | Out-File -encoding ASCII batch_`bi'.do "
+				!powershell -command " (Get-Content batch_`bi'.do) -replace '*local parallel', '**local parallel' | Out-File -encoding ASCII batch_`bi'.do "
 				
 				* Append line to myscript.sh
 				if `bi'==`iniparallelyear' file write myscript `"   "`c(sysdir_stata)'/StataMP-64" /e /i do batch_`bi'.do "'
@@ -139,7 +148,7 @@ etime, start
 			
 			* Close myscript.sh file
 			file close myscript	
-			!myscript.bat
+			if "`parallel_automatic'"=="yes" !myscript.bat
 			etime
 			exit	
 		}
@@ -166,9 +175,9 @@ etime, start
 	}
 	
 	* Read CPI in MacOSX
-	if "`c(os)'"=="MacOSX" {
+	if (c(os)=="MacOSX"|c(os)=="Unix") {
 		noi di ""
-		noi di as text "Note: MacOSX, datalibweb skipped. CPI data should exist alreay in the Data/ folder"
+		noi di as text "Note: MacOSX/Unix, datalibweb skipped. CPI data should exist alreay in the Data/ folder"
 		
 		cap use "$data_in/datalib_support_2005_GMDRAW.dta", clear
 		if _rc {

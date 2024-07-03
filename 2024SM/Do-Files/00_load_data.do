@@ -14,7 +14,7 @@
 	* Year: 2022
 	if `year'==2022 {
 		
-		if "`c(os)'"=="Windows" {
+		if c(os)=="Windows" {
 		foreach module in LBR INC IND {
 			cap datalibweb, country(BGD) year(2022) type(SARMD) vermast(02) veralt(02) survey(HIES) module(`module') clear
 			if _rc {
@@ -30,7 +30,7 @@
 		}
 		}
 		
-		if "`c(os)'"=="MacOSX" {
+		if (c(os)=="MacOSX"|c(os)=="Unix") {
 		noi di ""
 		noi di as text "MacOSX, datalibweb skipped"
 		foreach module in LBR INC IND {
