@@ -268,9 +268,9 @@ Note: MacOSX/Unix, datalibweb skipped. CPI data should exist alreay in the Data
 .         rename code countrycode
 .         tempfile dlwcpi
 .         save `dlwcpi', replace
-(file /var/folders/fc/5g_0xpf55dz7bg775xzr1vfw0000gp/T//St45322.000001 not
+(file /var/folders/fc/5g_0xpf55dz7bg775xzr1vfw0000gp/T//St45880.000001 not
     found)
-file /var/folders/fc/5g_0xpf55dz7bg775xzr1vfw0000gp/T//St45322.000001 saved
+file /var/folders/fc/5g_0xpf55dz7bg775xzr1vfw0000gp/T//St45880.000001 saved
     as .dta format
 . 
 .         * 0. load data
@@ -365,7 +365,7 @@ MacOSX, datalibweb skipped
 .         tempfile labor
 . 
 .         save `labor'
-file /var/folders/fc/5g_0xpf55dz7bg775xzr1vfw0000gp/T//St45322.000002 saved
+file /var/folders/fc/5g_0xpf55dz7bg775xzr1vfw0000gp/T//St45880.000002 saved
     as .dta format
 . 
 .         use "$INC", clear
@@ -376,7 +376,7 @@ file /var/folders/fc/5g_0xpf55dz7bg775xzr1vfw0000gp/T//St45322.000002 saved
 .         tempfile income
 . 
 .         save `income'
-file /var/folders/fc/5g_0xpf55dz7bg775xzr1vfw0000gp/T//St45322.000003 saved
+file /var/folders/fc/5g_0xpf55dz7bg775xzr1vfw0000gp/T//St45880.000003 saved
     as .dta format
 . 
 .         use "$IND", clear
@@ -628,11 +628,11 @@ file /Users/Israel/OneDrive/WBG/ETIRI/Projects/FY24/FY24 5 SAS -
   4.                 clear matrix
   5. 
 .                 * Load auxiliary simulation programs
-.                 local files : dir "$thedo/aux" files "*.do"
+.                 local files : dir "$thedo/auxcode" files "*.do"
   6.                 di `files'
   7.                 foreach f of local files{
   8.                         dis in yellow "`f'"
-  9.                         qui: run "$thedo/aux/`f'"
+  9.                         qui: run "$thedo/auxcode/`f'"
  10.                 }
  11. 
 .                 * Use base household survey

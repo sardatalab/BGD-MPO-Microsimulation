@@ -217,7 +217,7 @@ etime, start
 		di `files'
 		foreach f of local files{
 			dis in yellow "`f'"
-			qui: run "$thedo/auxcode/`f'"
+			qui: run "$thedo/aux/`f'"
 		}
 
 		* Use base household survey

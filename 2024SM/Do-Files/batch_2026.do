@@ -213,11 +213,11 @@ etime, start
 		clear matrix
 
 		* Load auxiliary simulation programs
-		local files : dir "$thedo/aux" files "*.do"
+		local files : dir "$thedo/auxcode" files "*.do"
 		di `files'
 		foreach f of local files{
 			dis in yellow "`f'"
-			qui: run "$thedo/aux/`f'"
+			qui: run "$thedo/auxcode/`f'"
 		}
 
 		* Use base household survey
