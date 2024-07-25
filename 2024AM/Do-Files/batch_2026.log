@@ -24,21 +24,23 @@ Notes:
 
 . do batch_2026 
 
-. *!v1.0
+. *!v2.0
 . *============================================================================
 > ===
-. * TITLE: Macro Poverty Outlook micro-simulations
+. * Macro-Micro Simulations
 . *============================================================================
 > ===
 . * Created on : July 24, 2024
 . * Last update: July 24, 2024
 . *============================================================================
 > ===
-. * Prepared by: Israel Osorio Rodarte
-. * E-mail: iosoriorodarte@worldbank.org
+. * Prepared by: South Asia Regional Stats Team
 . 
-. * Modified by: 
-. * E-mail:
+. * Initiated by: Sergio Olivieri
+. * E-mail: colivieri@worldbank.org
+. 
+. * Modified by: Israel Osorio Rodarte
+. * E-mail: iosoriorordarte@worldbank.org
 . *============================================================================
 > ===
 . 
@@ -97,17 +99,17 @@ Notes:
 .         gl sector_model 6                       // 
 .         gl random_remittances "no" // Change for "yes" or "no" on modelling
 .         gl baseyear 2022
-. 
+.         
 . * Databases
 .         global reload_dlw        ""             // if yes, reloads databases 
 > from datalibweb
-.         local  loadhhdata ""            // if yes, save dta for Simulation (b
-> etter in sequential mode)
+.         local  loadhhdata ""            // if yes, save dta for Simulation (f
+> orced for sequential mode)
 .         local  runsim     "yes"         // Run simulations
 . 
 . 
 . * Initial and final year for sequential run
-.         local iniyear = 2022    // Initial year when doing sequential runs
+.         local iniyear = 2027    // Initial year when doing sequential runs
 .         local finyear = 2027    // Final year when doing sequential runs
 . 
 . * Local parallel
@@ -241,9 +243,12 @@ Notes:
 > ===
 . if "`loadhhdata'"=="yes" & "`parallel'"=="" {
 .         
-.         * 0. load data
-.         do "$thedo/00_load_data.do"
+.         * 000. load data
+.         do "$thedo/000_load_data.do"
 . 
+.         * 001. macro shares to Tableau
+.         do "$thedo/001_sar_mpo_tableau_dashboard.do"
+.         
 .         * Save
 .         save "$data_root/BGD_2022_HIES_v02_M_v02_A_SARMD_SIM.dta", replace
 .         
@@ -275,39 +280,45 @@ Notes:
 .                 gl inputs   "$data_in/Macro and elasticities/Inputs elasticit
 > ies `yyyy'.xlsx" // Country's input Excel file
  13. 
-.                 * 1.input parameters
-.                         do "$thedo/01_parameters.do"
- 14.                 * 2.prepare variables
-.                         do "$thedo/02_variables.do"
- 15.                 * 3.model labor incomes by groups
-.                         do "$thedo/03_occupation.do"
- 16.                 * 4.model labor incomes by skills
-.                         do "$thedo/04_labor_income.do"
- 17.                 * 5.modeling population growth
-.                         do "$thedo/05_population.do"
- 18.                 * 6.modeling labor activity rate
-.                         do "$thedo/06_activity.do"
- 19.                 * 7.modeling unemployment rate
-.                         do "$thedo/07_unemployment.do"
- 20.                 * 8.modeling changes in employment by sectors
-.                         do "$thedo/08_struct_emp.do"
- 21.                 * 9.modeling labor income by sector
-.                         do "$thedo/09_asign_labor_income.do"    
- 22.                 * 10.income growth by sector
-.                         do "$thedo/$do_income.do"
- 23.                 * 11. total labor incomes
-.                         do "$thedo/11_total_income.do"  
- 24.                 * 12. total non-labor incomes
-.                         do "$thedo/12_assign_nlai.do"
- 25.                 * 13. household income
-.                         do "$thedo/13_household_income.do"
- 26. 
+.                 * 010.input parameters
+.                         do "$thedo/010_parameters.do"
+ 14.                 * 020.prepare variables
+.                         do "$thedo/020_variables.do"
+ 15.                 * 030.model labor incomes by groups
+.                         do "$thedo/030_occupation.do"
+ 16.                 * 040.model labor incomes by skills
+.                         do "$thedo/040_labor_income.do"
+ 17.                 * 050.modeling population growth
+.                         do "$thedo/050_population.do"
+ 18.                 * 060.modeling labor activity rate
+.                         do "$thedo/060_activity.do"
+ 19.                 * 070.modeling unemployment rate
+.                         do "$thedo/070_unemployment.do"
+ 20.                 * 080.modeling changes in employment by sectors
+.                         do "$thedo/080_struct_emp.do"
+ 21.                 * 090.modeling labor income by sector
+.                         do "$thedo/090_asign_labor_income.do"   
+ 22.                 * 100.income growth by sector
+.                         if "$re_scale" == "yes" do "$thedo/100_income_rel_new
+> .do"
+ 23.                         if "$re_scale" == ""    do "$thedo/101_income_rel_
+> new_no_rescaling.do"
+ 24.                 * 110. total labor incomes
+.                         do "$thedo/110_total_income.do" 
+ 25.                 * 120. total non-labor incomes
+.                         if "$random_remittances" == "no"  do "$thedo/120_assi
+> gn_nlai.do"
+ 26.                         if "$random_remittances" == "yes" do "$thedo/121_a
+> ssign_nlai.do"
+ 27.                 * 130. household income
+.                         do "$thedo/130_household_income.do"
+ 28. 
 .                 * Quick summary
 .                         ineqdec0 pc_inc_s  [w=fexp_s]
- 27.                         
+ 29.                         
 .                 drop if welfarenom==.
- 28.                 save "${data_out}/basesim_${model}", replace
- 29.         }
+ 30.                 save "${data_out}/basesim_${model}", replace
+ 31.         }
 cuantiles.doprog_mata.dozk.domtab1.domatnames.dogini.dotheil.dodesigual.doshare
 > s.doparam_res.dofgt.dosimchoiceres.do
 cuantiles.do
@@ -331,7 +342,8 @@ simchoiceres.do
 . * E-mail: solivieri@worldbank.org
 . *===========================================================================
 . * Created on : Dec 03, 2020
-. * Last update: Jan 04, 2021 Kelly Y. Montoya
+. * Last update: Jun 26, 2024 - Israel Osorio Rodarte
+. *                          Jan 04, 2021 Kelly Y. Montoya
 . *                          Jan 13, 2021 - Modification of average labor incom
 > e sheet
 . *                          Jul 22, 2022 - Added macro data matrix for re-scal
@@ -345,20 +357,6 @@ simchoiceres.do
 . *===========================================================================
 . * setting up the model
 . *===========================================================================
-. 
-. *tasas de crecimiento del GDP en comparacion con el anio base
-. 
-. 
-.         * sectorial growth rates
-.         gl input_gdp_sheet "input_gdp2"
-
-.         
-.         * do-file 10 for re-scaling options
-.         if "$re_scale" == "yes" gl do_income "10_income_rel_new"
-
-.         else gl do_income "10_income_rel_new_no_rescaling"
-
-.         
 . 
 . 
 . * mata matrix
@@ -404,12 +402,6 @@ simchoiceres.do
 model was int now str4
 
 . 
-. * number of months without payment
-. /*
-> gl  redu = redu[1]
-> if  redu != 0 gl t = 2
-> if  redu == 0 gl t = 1
-> */
 . * bonus
 . if inlist(bonus,1) gl bonus = 1
 
@@ -419,6 +411,7 @@ model was int now str4
 . * sectors (by default 6 sectors)
 . gl m = num_sectors[1]
 
+. 
 . * new weights
 . if inlist(weights,1) gl weights = 1
 
@@ -426,8 +419,8 @@ model was int now str4
 
 . 
 . * average labor incomes
-. import excel using "$inputs", sheet("$input_gdp_sheet") first clear    //inpu
-> t_gdp2
+. import excel using "$inputs", sheet("input_labor_incomes") first clear    //i
+> nput_gdp2
 (2 vars, 7 obs)
 
 . mkmat rate, mat(growth_labor_income)
@@ -447,25 +440,12 @@ model was int now str4
 . mkmat rate, mat(growth_labor)
 
 . 
-. /* informality
-> import excel using "$inputs", sheet("input_informality") first clear
-> mkmat rate, mat(growth_informal)*/
-. 
 . * non-labor incomes
 . import excel using "$inputs", sheet("input_nonlabor") first clear
 (2 vars, 4 obs)
 
 . mkmat rate, mat(growth_nlabor)
 
-. 
-. /* poverty lines
-> import excel using "$inputs", sheet("input_pl") first clear
-> mkmat value, mat(growth_pl)*/
-. 
-. 
-. *===========================================================================
-. * Population growth 
-. *===========================================================================
 . 
 . * total population
 . import excel using "$inputs", sheet("input_pop_wdi") first clear
@@ -474,26 +454,6 @@ model was int now str4
 . mkmat value, mat(growth_pop_wdi)
 
 . 
-. /* population by gender
-> import excel using "$inputs", sheet("input_population") first clear
-> mkmat female, mat(growth_pop_female)
-> mkmat male  , mat(growth_pop_male)
-> 
-> * population in time 0
-> mat vec_pop_grw0 = growth_pop_female\growth_pop_male
-> mat vec_pop_grw0 = J(rowsof(vec_pop_grw0),colsof(vec_pop_grw0),1) + vec_pop_g
-> rw0
-> 
-> loc cols = colsof(vec_pop_grw0)
-> loc rows = rowsof(vec_pop_grw0)
-> 
-> 
-> * population in time 1
-> mat vec_pop_grw1 = vec_pop_grw0[....,1]
-> forvalues i = 2(1)`cols'{
->   mat aux = vec_pop_grw0[....,`i']
->   mat vec_pop_grw1 = vec_pop_grw1\aux
-> }*/
 . 
 . restore
 
@@ -5694,39 +5654,6 @@ end of do-file
 . * E-mail: solivieri@worldbank.org
 . *============================================================================
 > =
-. * Created on : Mar 17, 2020
-. * Last update: Jul 18, 2022
-. *============================================================================
-> =
-. * Modified by: Kelly Y. Montoya (kmontoyamunoz@worldbank.org)
-. * Modification: 04/29/2022 - Correction of h_nlai_s
-. *                               07/18/2022 - Modification on remittances mode
-> lling
-. *============================================================================
-> =
-. 
-. 
-. *============================================================================
-> =
-. * A. Private transfers
-. *============================================================================
-> =
-. 
-. * Remittances are increased only to those who are receiving, and they increse
->  at the remittances grow rate
-. 
-. if "${random_remittances}" == "no" {
-.         do "${thedo}/12_assign_nlai_0.do"
-
-. *!v1.0
-. *============================================================================
-> =
-. * TITLE: 12  Non-labor income
-. *===========================================================================
-. * Prepared by: Sergio Olivieri
-. * E-mail: solivieri@worldbank.org
-. *============================================================================
-> =
 . * Created on : Jul 11, 2022
 . * Last update: Jul 18, 2022
 . *============================================================================
@@ -5920,47 +5847,15 @@ transfers
 (52,827 missing values generated)
 
 . 
-. *============================================================================
-> =
-. *                                     END
-. *============================================================================
-> =
-. 
-end of do-file
-. }
-
-. 
-. if "${random_remittances}" == "yes" {
-.         do "${thedo}/12_assign_nlai_1.do"
-. }
-
-. 
-. 
-. 
-. *============================================================================
-> =
-. * C. Total non-labor income
-. *============================================================================
-> =
-. //egen h_nlai_s = rowtotal(h_remesas_s h_pensions_s h_capital_s h_privtrans_s
->  h_transfers_s h_cct_s h_renta_imp_s h_otherinla_s) if jefe == 1, missing
-. 
-. *gen h_nlai_s = rowtotal(h_remesas_s h_pensions_s h_capital_s h_renta_imp_s h
-> _otherinla_s h_transfers_s) if jefe == 1, missing
-. 
-. * KM: I made this adjustment to non-labor income
+. * Adjustment done by KM
 . egen aux_nlai_s = rowtotal(h_remesas_s h_pensions_s h_capital_s h_renta_imp_s
 >  h_otherinla_s h_transfers_s) if h_head == 1, missing
 (49,331 missing values generated)
 
-. 
 . bysort id: egen h_nlai_s = sum(aux_nlai_s) if h_head != ., m
 (7,087 missing values generated)
 
 . 
-. *gen h_nlai_s = nlai_s / h_size
-. 
-. *drop nlai_s
 . 
 . *============================================================================
 > =

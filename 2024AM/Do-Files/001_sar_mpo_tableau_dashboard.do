@@ -1,3 +1,8 @@
+*!v1.0 July 25, 2024
+*===============================================================================
+* This do-file reads information from MFMod and sends to 
+* a series of databases called MPO 
+*===============================================================================
 clear
 set more off
 
@@ -9,7 +14,7 @@ set more off
 * Location of raw csv files with 
 * historical and forecast data
 *********************************
-global qpath "S:/MFM/MFMOD/SM24/data/fcst_check/SM24"
+global qpath "S:/MFM/MFMOD/AM24/data/fcst_check/AM24"
 * For SM24, the location is: S:/MFM/MFMOD/SM24/data/fcst_check/SM24
 * "//rsb-vtest/c$/wamp/apps/isimulate/trunk/web/MFMod_support/consistency_widget"
 * \\rsb-vtest\c$\wamp\apps\isimulate\trunk\web\MFMod_support\consistency_widget
@@ -18,10 +23,11 @@ global qpath "S:/MFM/MFMOD/SM24/data/fcst_check/SM24"
 * Location to save Tableau Dashboards
 **************************************
 if "`c(os)'"=="Windows" {
-	 global rpath "C:/Users/WB308767/OneDrive/WBG/ETIRI/Projects/FY24/FY24 5 SAS - Bangladesh/BGD_branch/Tableau"
+	 global rpath "C:/Users/WB308767/OneDrive/WBG/ETIRI/Projects/FY25/FY25 - SAR MPO AM24/BGD-MPO-Microsimulation/2024AM/Data/INPUT/Tableau"
+	               
 }
 else {
-	global rpath "/Users/Israel/OneDrive/WBG/ETIRI/Projects/FY24/FY24 5 SAS - Bangladesh/BGD_branch/Tableau"
+	global rpath "/Users/Israel/OneDrive/WBG/ETIRI/Projects/FY25/FY25 - SAR MPO AM24/BGD-MPO-Microsimulation/2024AM/Data/INPUT/Tableau"
 }
 
 *******************
@@ -34,7 +40,7 @@ local dostep2 "yes"	// Create aggregates and export CSV data for Tableau
 *********************
 * Application folder
 *********************
-global application "SM_24"
+global application "AM_24"
 global wpath "${qpath}"
 global cpath "${rpath}/${application} MPO Check"
 
@@ -174,7 +180,7 @@ if "`dostep2'"=="yes" {
 	import excel using ///
 	"https://datacatalogfiles.worldbank.org/ddh-published/0037712/DR0090755/CLASS.xlsx", ///
 	clear firstrow
-		 drop F
+		cap drop F
 		rename Economy wbcountry_name
 		rename Code wbccode
 		rename Region wbregion_name
@@ -356,7 +362,8 @@ if "`dostep2'"=="yes" {
 	
 		contract topicid topicname indicatorid sectorid sectorname
 		drop _freq
-		outsheet using "$cpath/MPO Topics.csv"
+		drop if topicid==.
+		outsheet using "$cpath/MPO Topics.csv", comma replace
 	restore
 	
 	/*

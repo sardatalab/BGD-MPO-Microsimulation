@@ -5,12 +5,11 @@
 * Prepared by: Sergio Olivieri
 * E-mail: solivieri@worldbank.org
 *=============================================================================
-* Created on : Mar 17, 2020
+* Created on : Jul 11, 2022
 * Last update: Jul 18, 2022
 *=============================================================================
 * Modified by: Kelly Y. Montoya (kmontoyamunoz@worldbank.org)
-* Modification: 04/29/2022 - Correction of h_nlai_s
-*				07/18/2022 - Modification on remittances modelling
+*			   Jul 18, 2022 - Adapted the ECU version to the full project.
 *=============================================================================
 
 
@@ -18,33 +17,84 @@
 * A. Private transfers
 *=============================================================================
 
-* Remittances are increased only to those who are receiving, and they increse at the remittances grow rate
+loc nl_incomes "remesas pensions capital transfers"
+loc lim : word count `nl_incomes'
+dis `lim'
 
-if "${random_remittances}" == "no" {
-	do "${thedo}/12_assign_nlai_0.do"
+forvalues i = 1/`lim' {
+loc x : word `i' of `nl_incomes'
+
+dis as text "{hline}" _newline ///
+	as text " nl income = `x'" _newline ///
+    as text "{hline}" _newline
+
+*  1. calculates the growth rate of capital according to population growth 
+sum h_`x' [aw = wgt  ] if h_`x' > 0 & h_`x' <.
+mat var0 = r(sum) / 1000000
+sum h_`x' [aw = fexp_s] if h_`x' > 0 & h_`x' <.
+mat var1 = r(sum) / 1000000
+
+* 2. calculates the difference between micro and macro data growth rates  
+mat growth_`x' = growth_nlabor[`i',1]
+
 }
 
-if "${random_remittances}" == "yes" {
-	do "${thedo}/12_assign_nlai_1.do"
+mata:
+M = st_matrix("var0")
+C = st_matrix("var1")
+V = st_matrix("growth_remesas")
+G = M:*(1:+V)
+H = (G:/C):-1
+st_matrix("growth_remesas_adjust",H)
+end
+
+mata:
+M = st_matrix("var0")
+C = st_matrix("var1")
+V = st_matrix("growth_pensions")
+G = M:*(1:+V)
+H = (G:/C):-1
+st_matrix("growth_pensions_adjust",H)
+end
+
+mata:
+M = st_matrix("var0")
+C = st_matrix("var1")
+V = st_matrix("growth_capital")
+G = M:*(1:+V)
+H = (G:/C):-1
+st_matrix("growth_capital_adjust",H)
+end
+
+mata:
+	M = st_matrix("var0")
+	C = st_matrix("var1")
+	V = st_matrix("growth_transfers")
+	G = M:*(1:+V)
+	H = (G:/C):-1
+	st_matrix("growth_transfers_adjust",H)
+end
+
+
+foreach x of local nl_incomes {
+    dis as text "`x'"
+* 3. expands private tranfers according to the new growth rate 
+gen  h_`x'_s = h_`x' *(1 + growth_`x'_adjust[1,1] ) if h_`x' !=.
+
 }
 
+* others non-labor transfers  
+gen  h_otherinla_s  = h_otherinla
+//gen h_privtrans_s = h_privtrans
 
 
-*=============================================================================
-* C. Total non-labor income
-*=============================================================================
-//egen h_nlai_s = rowtotal(h_remesas_s h_pensions_s h_capital_s h_privtrans_s h_transfers_s h_cct_s h_renta_imp_s h_otherinla_s) if jefe == 1, missing
+* imputed rent
+gen h_renta_imp_s = h_renta_imp
 
-*gen h_nlai_s = rowtotal(h_remesas_s h_pensions_s h_capital_s h_renta_imp_s h_otherinla_s h_transfers_s) if jefe == 1, missing
-
-* KM: I made this adjustment to non-labor income
+* Adjustment done by KM
 egen aux_nlai_s = rowtotal(h_remesas_s h_pensions_s h_capital_s h_renta_imp_s h_otherinla_s h_transfers_s) if h_head == 1, missing
-
 bysort id: egen h_nlai_s = sum(aux_nlai_s) if h_head != ., m
 
-*gen h_nlai_s = nlai_s / h_size
-
-*drop nlai_s
 
 *=============================================================================
 *                                     END

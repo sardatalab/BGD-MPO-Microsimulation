@@ -1,0 +1,9 @@
+countryid,country,wbcountry_name,wbccode,wbregion_name,wblending
+1,"AFG","Afghanistan","AFG","South Asia","IDA"
+14,"BGD","Bangladesh","BGD","South Asia","IDA"
+24,"BTN","Bhutan","BTN","South Asia","IDA"
+74,"IND","India","IND","South Asia","IBRD"
+96,"LKA","Sri Lanka","LKA","South Asia","IDA"
+104,"MDV","Maldives","MDV","South Asia","IDA"
+124,"NPL","Nepal","NPL","South Asia","IDA"
+127,"PAK","Pakistan","PAK","South Asia","Blend"

@@ -403,6 +403,11 @@ drop region
 rename region_aux region
 ta region
 
+* Adjustment done by KM
+egen aux_nlai_s = rowtotal(h_remesas_s h_pensions_s h_capital_s h_renta_imp_s h_otherinla_s h_transfers_s) if h_head == 1, missing
+bysort id: egen h_nlai_s = sum(aux_nlai_s) if h_head != ., m
+
+
 *===========================================================================
 *                                     END
 *===========================================================================

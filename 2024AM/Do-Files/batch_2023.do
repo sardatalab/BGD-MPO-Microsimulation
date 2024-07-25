@@ -1,15 +1,17 @@
-*!v1.0
+*!v2.0
 *===============================================================================
-* TITLE: Macro Poverty Outlook micro-simulations
+* Macro-Micro Simulations
 *===============================================================================
 * Created on : July 24, 2024
 * Last update: July 24, 2024
 *===============================================================================
-* Prepared by: Israel Osorio Rodarte
-* E-mail: iosoriorodarte@worldbank.org
+* Prepared by: South Asia Regional Stats Team
 
-* Modified by: 
-* E-mail:
+* Initiated by: Sergio Olivieri
+* E-mail: colivieri@worldbank.org
+
+* Modified by: Israel Osorio Rodarte
+* E-mail: iosoriorordarte@worldbank.org
 *===============================================================================
 
 *===============================================================================
@@ -56,15 +58,15 @@ etime, start
 	gl sector_model 6 			// 
 	gl random_remittances "no" // Change for "yes" or "no" on modelling
 	gl baseyear 2022
-
+	
 * Databases
 	global reload_dlw 	 ""		// if yes, reloads databases from datalibweb
-	local  loadhhdata ""		// if yes, save dta for Simulation (better in sequential mode)
+	local  loadhhdata ""		// if yes, save dta for Simulation (forced for sequential mode)
 	local  runsim	  "yes" 	// Run simulations
 
 
 * Initial and final year for sequential run
-	local iniyear = 2022	// Initial year when doing sequential runs
+	local iniyear = 2027	// Initial year when doing sequential runs
 	local finyear = 2027	// Final year when doing sequential runs
 
 * Local parallel
@@ -171,9 +173,12 @@ etime, start
 *===============================================================================
 if "`loadhhdata'"=="yes" & "`parallel'"=="" {
 	
-	* 0. load data
-	do "$thedo/00_load_data.do"
+	* 000. load data
+	do "$thedo/000_load_data.do"
 
+	* 001. macro shares to Tableau
+	do "$thedo/001_sar_mpo_tableau_dashboard.do"
+	
 	* Save
 	save "$data_root/BGD_2022_HIES_v02_M_v02_A_SARMD_SIM.dta", replace
 	
@@ -202,32 +207,34 @@ if "`runsim'"=="yes" {
 		* Globals for reading scenarios
 		gl inputs   "$data_in/Macro and elasticities/Inputs elasticities `yyyy'.xlsx" // Country's input Excel file
 
-		* 1.input parameters
-			do "$thedo/01_parameters.do"
-		* 2.prepare variables
-			do "$thedo/02_variables.do"
-		* 3.model labor incomes by groups
-			do "$thedo/03_occupation.do"
-		* 4.model labor incomes by skills
-			do "$thedo/04_labor_income.do"
-		* 5.modeling population growth
-			do "$thedo/05_population.do"
-		* 6.modeling labor activity rate
-			do "$thedo/06_activity.do"
-		* 7.modeling unemployment rate
-			do "$thedo/07_unemployment.do"
-		* 8.modeling changes in employment by sectors
-			do "$thedo/08_struct_emp.do"
-		* 9.modeling labor income by sector
-			do "$thedo/09_asign_labor_income.do"	
-		* 10.income growth by sector
-			do "$thedo/$do_income.do"
-		* 11. total labor incomes
-			do "$thedo/11_total_income.do"	
-		* 12. total non-labor incomes
-			do "$thedo/12_assign_nlai.do"
-		* 13. household income
-			do "$thedo/13_household_income.do"
+		* 010.input parameters
+			do "$thedo/010_parameters.do"
+		* 020.prepare variables
+			do "$thedo/020_variables.do"
+		* 030.model labor incomes by groups
+			do "$thedo/030_occupation.do"
+		* 040.model labor incomes by skills
+			do "$thedo/040_labor_income.do"
+		* 050.modeling population growth
+			do "$thedo/050_population.do"
+		* 060.modeling labor activity rate
+			do "$thedo/060_activity.do"
+		* 070.modeling unemployment rate
+			do "$thedo/070_unemployment.do"
+		* 080.modeling changes in employment by sectors
+			do "$thedo/080_struct_emp.do"
+		* 090.modeling labor income by sector
+			do "$thedo/090_asign_labor_income.do"	
+		* 100.income growth by sector
+			if "$re_scale" == "yes" do "$thedo/100_income_rel_new.do"
+			if "$re_scale" == ""    do "$thedo/101_income_rel_new_no_rescaling.do"
+		* 110. total labor incomes
+			do "$thedo/110_total_income.do"	
+		* 120. total non-labor incomes
+			if "$random_remittances" == "no"  do "$thedo/120_assign_nlai.do"
+			if "$random_remittances" == "yes" do "$thedo/121_assign_nlai.do"
+		* 130. household income
+			do "$thedo/130_household_income.do"
 
 		* Quick summary
 			ineqdec0 pc_inc_s  [w=fexp_s]
