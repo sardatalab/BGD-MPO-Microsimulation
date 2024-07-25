@@ -1,4 +1,4 @@
-*!v1.0 July 02, 2024
+*!v1.1 July 24, 2024
 *===============================================================================
 * Microsimulation load data
 * Based on each simulation year, this program loads and save the base household
@@ -11,6 +11,55 @@
 	*===========================================================================
 	local year = $baseyear
 
+	*===========================================================================
+	* Bring CPI
+	*===========================================================================
+	
+	local code="$country"
+	local year0=$baseyear
+	local cpiversion="09"	
+	
+	* Download CPI from datalibweb, in Windows
+	if "`c(os)'"=="Windows" {
+		if "$reload_dlw"=="yes" {
+			cap datalibweb, country(Support) year(2005) type(GMDRAW) surveyid(Support_2005_CPI_v`cpiversion'_M) filename(Final_CPI_PPP_to_be_used.dta)
+			if _rc {
+				noi di ""
+				noi di as error "Note: Downloading data from datalibweb failed. Verify connection"
+				exit
+			}
+			else save "$data_in/datalib_support_2005_GMDRAW.dta", replace
+		}
+		if "$reload_dlw"=="" {
+			cap use "$data_in/datalib_support_2005_GMDRAW.dta", clear
+			if _rc {
+				noi di as error "CPI data not found. Download it using datalibweb in Windows"
+				exit
+			}	
+		}
+	}
+	
+	* Read CPI in MacOSX
+	if (c(os)=="MacOSX"|c(os)=="Unix") {
+		noi di ""
+		noi di as text "Note: MacOSX/Unix, datalibweb skipped. CPI data should exist alreay in the Data/ folder"
+		
+		cap use "$data_in/datalib_support_2005_GMDRAW.dta", clear
+		if _rc {
+			noi di as error "CPI data not found. Download it using datalibweb in Windows"
+			exit
+		}
+	}
+	
+	* Save CPI temporary file
+	keep if code=="`code'" & year==`year0'
+	keep code year cpi2017 icp2017
+	rename code countrycode
+	tempfile dlwcpi
+	save `dlwcpi', replace	
+	
+	
+	
 	* Year: 2022
 	if `year'==2022 {
 		
@@ -187,6 +236,14 @@
 	gen workage=0
 	replace workage=1 if age>=15 & age<=64
 	tab workage [iw=wgt]
+	
+	*===========================================================================
+	* Merge CPI
+	*===========================================================================		
+	drop cpi2017
+	merge m:1 countrycode year using `dlwcpi'
+	keep if _merge==3
+	drop _merge	
 	
 }
 *===============================================================================
