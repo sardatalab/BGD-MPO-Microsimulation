@@ -60,13 +60,70 @@ gl m = num_sectors[1]
 if inlist(weights,1) gl weights = 1
 if inlist(weights,0) gl weights = 0
 
+* macro data
+import excel using "$inputs", sheet("input_gdp") first clear
+
+* macro data from simulation file
+	use dateid bgdnv* using "$data_in/Macro and elasticities/bgd - spring meetings 2024 - pov - corrected pop 2.dta", clear
+	gen year = yofd(dateid)
+	drop dateid
+	foreach var of varlist bgd* {
+		local nname = substr("`var'",4,60)
+		rename `var' `nname'
+	}
+	
+	gen double nvindrestkn = (nvindtotlkn - nvindconskn)
+	gen double nvsrvrestkn = (nvsrvtotlkn - nvsrvtrnskn - nvsrvfinakn)
+	
+	keep  year nvagrtotlkn nvindconskn nvindrestkn nvsrvtrnskn nvsrvfinakn nvsrvrestkn
+	order year nvagrtotlkn nvindconskn nvindrestkn nvsrvtrnskn nvsrvfinakn nvsrvrestkn
+	
+	egen double nvgdptotlkn = rsum(nvagrtotlkn nvindconskn nvindrestkn nvsrvtrnskn nvsrvfinakn nvsrvrestkn)
+	
+	tsset year, yearly
+	
+	foreach var of varlist nv*kn {
+		sum `var' if year==$base_year
+		local b`var' = r(mean)
+		gen double lav`var' = `var'/`b`var''-1
+	}
+	
+	keep if year == $sim_year
+	keep year lav*
+	reshape long lav, i(year) j(sector) string
+	rename lav rate
+	rename sector strsector	
+	
+	gen sector = .
+	replace sector = 1 if strsector=="nvagrtotlkn"
+	replace sector = 2 if strsector=="nvindrestkn"
+	replace sector = 3 if strsector=="nvindconskn"
+	replace sector = 4 if strsector=="nvsrvrestkn"
+	replace sector = 5 if strsector=="nvsrvtrnskn"
+	replace sector = 6 if strsector=="nvsrvfinakn"
+									  
+	replace sector = 7 if strsector=="nvgdptotlkn"
+	
+	#delimit ;
+	label define lblsector
+	1 "gdp_agric"
+	2 "gdp_ind"
+	3 "gdp_cons"
+	4 "gdp_serv"
+	5 "gdp_transp"
+	6 "gdp_fin"
+	7 "gdp";
+	#delimit cr
+	label values sector lblsector
+	drop strsector
+	order year sector
+	sort year sector
+	
+mkmat rate, mat(growth_macro_data)
+
 * average labor incomes
 import excel using "$inputs", sheet("input_labor_incomes") first clear    //input_gdp2
 mkmat rate, mat(growth_labor_income)
-
-* macro data
-import excel using "$inputs", sheet("input_gdp") first clear
-mkmat rate, mat(growth_macro_data)
 
 * labor market
 import excel using "$inputs", sheet("input_labor") first clear

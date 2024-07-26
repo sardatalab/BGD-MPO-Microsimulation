@@ -35,17 +35,19 @@ etime, start
 	if c(os)=="Windows" & c(username)=="WB308767" {
 		 gl main  "C:/Users/WB308767/OneDrive/WBG/ETIRI/Projects/FY25/FY25 - SAR MPO AM24"
 	}
-
+	
 * Path	
 	gl path "$main/BGD-MPO-Microsimulation/2024AM"
+	cd "$path"
 	
 * Do-files path
 	gl thedo     "$path/Do-files" // Do-files path
 
 * Globals for country and year identification
-	gl country BGD 			// Country to upload
-	gl year 2022			// Year to upload - Base year dataset
-	gl final_year 2027		// Change for last simulated year
+	global country BGD 			// Country to upload
+	global year 2022			// household survey year to use
+	global final_year 2027		// Last simulated year
+	global base_year 2022		// Base year for building LAVs
 	
 	cap mkdir "${path}/Data"
 	gl data_root "${path}/Data"
@@ -70,7 +72,7 @@ etime, start
 	local finyear = 2027	// Final year when doing sequential runs
 
 * Local parallel
-	local parallel 	"yes"	// If "yes", the program will run in parallel mode
+	local parallel 	""	// If "yes", the program will run in parallel mode
 	
 }
 *===============================================================================
@@ -193,6 +195,9 @@ if "`runsim'"=="yes" {
 		clear mata
 		clear matrix
 
+		* Declarre simulation year
+		global sim_year = `yyyy'
+		
 		* Load auxiliary simulation programs
 		local files : dir "$thedo/auxcode" files "*.do"
 		di `files'
