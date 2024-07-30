@@ -15,20 +15,15 @@ set more off
 * historical and forecast data
 *********************************
 global qpath "S:/MFM/MFMOD/AM24/data/fcst_check/AM24"
-* For SM24, the location is: S:/MFM/MFMOD/SM24/data/fcst_check/SM24
-* "//rsb-vtest/c$/wamp/apps/isimulate/trunk/web/MFMod_support/consistency_widget"
-* \\rsb-vtest\c$\wamp\apps\isimulate\trunk\web\MFMod_support\consistency_widget
+* For AM24, 
+* the S location is:   \\wurepliprdfs03.wb.ad.worldbank.org\mpofile\GPG\Info_Mgmt_Tech\MPO
+* the full location is: \\wurepliprdfs03.wb.ad.worldbank.org\mpofile\GPG\Info_Mgmt_Tech\MPO\MFM\MFMOD\AM24\data\fcst_check\AM24
 
 **************************************
 * Location to save Tableau Dashboards
 **************************************
-if "`c(os)'"=="Windows" {
-	 global rpath "C:/Users/WB308767/OneDrive/WBG/ETIRI/Projects/FY25/FY25 - SAR MPO AM24/BGD-MPO-Microsimulation/2024AM/Data/INPUT/Tableau"
-	               
-}
-else {
-	global rpath "/Users/Israel/OneDrive/WBG/ETIRI/Projects/FY25/FY25 - SAR MPO AM24/BGD-MPO-Microsimulation/2024AM/Data/INPUT/Tableau"
-}
+
+	 global rpath "$data_in/Tableau"	               
 
 *******************
 * Steps to perform 
@@ -49,125 +44,134 @@ global cpath "${rpath}/${application} MPO Check"
 ********************************************************************************
 if "`dostep1'"=="yes" {
 
-* Get list of csv files with "n" suffix
-* n suffix means new data
-local csvfiles : dir "$wpath" files "*n.csv", respectcase
-noi di `csvfiles'
+if c(os)=="Windows" {
 
-* Loop for all csv files
-local j = 1
-foreach file of local csvfiles {
-	insheet using "$wpath/`file'", names clear
-	
-	rename v1 year
-	drop if year==.
-	
-	* Replace NULL for zeros
-	foreach var of varlist _all {
-		if "`var'"!="year" {
-			cap replace `var' = "" if `var'=="NULL"
-			rename `var' value`var'
+	* Get list of csv files with "n" suffix
+	* n suffix means new data
+	local csvfiles : dir "$wpath" files "*n.csv", respectcase
+	noi di `csvfiles'
+
+	* Loop for all csv files
+	local j = 1
+	foreach file of local csvfiles {
+		insheet using "$wpath/`file'", names clear
+		
+		rename v1 year
+		drop if year==.
+		
+		* Replace NULL for zeros
+		foreach var of varlist _all {
+			if "`var'"!="year" {
+				cap replace `var' = "" if `var'=="NULL"
+				rename `var' value`var'
+			}
 		}
+		
+		destring _all, replace 
+		reshape long value, i(year) j(variable) string
+		
+		if `j'==1 {
+			tempfile csvdata
+			save `csvdata', replace
+		}
+		else {
+			append using `csvdata'
+			save `csvdata', replace
+		}
+		local j = `j'+1
 	}
-	
-	destring _all, replace 
-	reshape long value, i(year) j(variable) string
-	
-	if `j'==1 {
-		tempfile csvdata
-		save `csvdata', replace
-	}
-	else {
-		append using `csvdata'
-		save `csvdata', replace
-	}
-	local j = `j'+1
+
+	* Format csv files
+	use `csvdata', clear
+
+		gen country  = upper(substr(variable,1,3))
+		gen mne      = upper(substr(variable,4,30))
+		gen length = length(mne)
+		gen mnemonic = substr(mne,1,length)
+		gen type = "N"
+			drop variable mne length
+
+	gen ml = length(mnemonic)
+	replace mnemonic = substr(mnemonic,1,ml-2)
+
+	* Create variable labels
+	gen varlabel=""
+	replace varlabel = "Potential Output Growth (constant 2010 U.S. dollars)" if mnemonic=="PGDP"
+	replace varlabel = "GDP growth (constant 2010 LCU, percentage change)" if mnemonic=="GDPZ"
+	replace varlabel = "Inflation (consumer price index 2000 = 100, percentage change)" if mnemonic=="CPIZ"
+	replace varlabel = "Output gap (percentage of potential output)" if mnemonic=="GAP_"
+	replace varlabel = "Current account balance (percentage share of nominal GDP)" if mnemonic=="CAB_"
+	replace varlabel = "General government balance (% of nominal GDP)" if mnemonic=="DEFICIT_"
+	replace varlabel = "General government gross debt (% of nominal GDP)" if mnemonic=="DEBT_"
+	replace varlabel = "Private consumption growth (constant 2010 LCU, percentae change)" if mnemonic=="CONZ"
+	replace varlabel = "Government consumption growth (constant 2010 LCU, percentage change)" if mnemonic=="GOVZ"
+	replace varlabel = "Fixed investment growth (constant 2010 LCU, percentage change)" if mnemonic=="INVZ"
+	replace varlabel = "Exports growth (constant 2010 LCU, percentage change)" if mnemonic=="EXPZ"
+	replace varlabel = "Imports growth (constant 2010 LCU, percentage change)" if mnemonic=="IMPZ"
+	replace varlabel = "Private consumption growth (percentage share of real GDP)" if mnemonic=="R_CON"
+	replace varlabel = "Government consumption growth (percentage share of real GDP)" if mnemonic=="R_GOV"
+	replace varlabel = "Fixed investment growth (percentage share of real GDP)" if mnemonic=="R_INV"
+	replace varlabel = "Fixed investment (percentage share of real GDP)" if mnemonic=="R_STKB"
+	replace varlabel = "Exports growth (percentage share of real GDP)" if mnemonic=="R_EXPZ"
+	replace varlabel = "Imports growth (percentage share of real GDP)" if mnemonic=="R_IMPZ"
+	replace varlabel = "Statistical discrepancy (percentage share of real GDP)" if mnemonic=="R_DISC"
+	replace varlabel = "GDP deflator (baseyear = 2010, percentage change)" if mnemonic=="GDPZX"
+	replace varlabel = "Private consumption deflator (baseyear = 2010, percentage change)" if mnemonic=="CONZX"
+	replace varlabel = "Government consumption deflator (baseyear = 2010, percentage change)" if mnemonic=="GOVZX"
+	replace varlabel = "Fixed investment deflator (baseyear = 2010, percentage change)" if mnemonic=="INVZX"
+	replace varlabel = "Exports deflator (baseyear = 2010, percentage change)" if mnemonic=="EXPZX"
+	replace varlabel = "Imports deflator (baseyear = 2010, percentage change)" if mnemonic=="IMPZX"
+	replace varlabel = "GDP at factor cost growth (constant 2010 LCU, percentage change)" if mnemonic=="GDPFC"
+	replace varlabel = "Taxes growth (constant 2010 LCU, percentage change)" if mnemonic=="TAXFC"
+	replace varlabel = "Agricultural growth (constant 2010 LCU, percentage change)" if mnemonic=="AGRFC"
+	replace varlabel = "Industry growth (constant 2010 LCU, percentage change)" if mnemonic=="INDFC"
+	replace varlabel = "Services growth (constant 2010 LCU, percentage change)" if mnemonic=="SRVFC"
+	replace varlabel = "Taxes (percentage share of real GDP at factor cost)" if mnemonic=="R_TAXFC"
+	replace varlabel = "Agriculture (percentage share of real GDP at factor cost)" if mnemonic=="R_AGRFC"
+	replace varlabel = "Industry (percentage share of real GDP at factor cost)" if mnemonic=="R_INDFC"
+	replace varlabel = "Services (percentage share of real GDP at factor cost)" if mnemonic=="R_SRVFC"
+	replace varlabel = "GDP at factor cost deflator (baseyear = 2010, percentage change)" if mnemonic=="GDPFCX"
+	replace varlabel = "Tax deflator (baseyear = 2010, percentage change)" if mnemonic=="TAXFCX"
+	replace varlabel = "Agriculture deflator (baseyear = 2010, percentage change)" if mnemonic=="AGRFCX"
+	replace varlabel = "Industry deflator (baseyear = 2010 percentage change)" if mnemonic=="INDFCX"
+	replace varlabel = "Services deflator (baseyear = 2010, percentage change)" if mnemonic=="SRVFCX"
+	replace varlabel = "Labor force growth (percentae change %)" if mnemonic=="LABZ"
+	replace varlabel = "Total factor productivity growth (percentage change %)" if mnemonic=="TFPZ"
+	replace varlabel = "Capital stock growth (percentage change %)" if mnemonic=="STKZ"
+	replace varlabel = "Potential GDP growth (constant 2010 LCU, percentage change)" if mnemonic=="PGDPZ"
+	replace varlabel = "Labor force (contribution, percentage points %p)" if mnemonic=="C_LABZ"
+	replace varlabel = "Total factor productiity (contribution, percentage points %p)" if mnemonic=="C_TFPZ"
+	replace varlabel = "Capital stock (contribution, percentage points %p)" if mnemonic=="C_STKZ"
+	replace varlabel = "Potential GDP growth (constant 2010 LCU, percentage change)" if mnemonic=="C_PGDPZ"
+	replace varlabel = "Capital and financial account balance (percentage share of nominal GDP)" if mnemonic=="CAF_"
+	replace varlabel = "Financial account balance, excl. R.A. (percentage share of nominal GDP)" if mnemonic=="FINX_"
+	replace varlabel = "Reserve asset changes [R.A.] (percentage share of nominal GDP)" if mnemonic=="RACG_"
+	replace varlabel = "Net errors and omissions (percentage share of nominal GDP)" if mnemonic=="NEOM_"
+	replace varlabel = "Capital account balance (percentage share of nominal GDP)" if mnemonic=="CAP_"
+	replace varlabel = "Financial account balance (percentage share of nominal GDP)" if mnemonic=="FINT_"
+	replace varlabel = "Foreign direct investment balance (percentage share of nominal GDP)" if mnemonic=="FDI_"
+	replace varlabel = "Portfolio investment balance, equity (percentage share of nominal GDP)" if mnemonic=="PFE_"
+	replace varlabel = "Portfolio investment balance, debt (percentae share of nominal GDP)" if mnemonic=="PFD_"
+	replace varlabel = "Other investment balance (percentage share of nominal GDP)" if mnemonic=="OTHR_"
+	replace varlabel = "Export market (percentage change %)" if mnemonic=="XMKT"
+	replace varlabel = "Nominal exchange rate (local currency per USD)" if mnemonic=="PANUSATLS"
+	replace varlabel = "Nominal effective exchange rate (2010 = 100)" if mnemonic=="NEER"
+	replace varlabel = "Real effective exchange rate (2010 = 100)" if mnemonic=="REER"
+		
+	split varlabel, p(" (")
+
+	rename varlabel1 title
+	rename varlabel2 subtitle
+	replace subtitle = "(" +  subtitle
+
+	save "${cpath}/MPO Check data All countries.dta", replace
+
 }
 
-* Format csv files
-use `csvdata', clear
-
-	gen country  = upper(substr(variable,1,3))
-	gen mne      = upper(substr(variable,4,30))
-	gen length = length(mne)
-	gen mnemonic = substr(mne,1,length)
-	gen type = "N"
-		drop variable mne length
-
-gen ml = length(mnemonic)
-replace mnemonic = substr(mnemonic,1,ml-2)
-
-* Create variable labels
-gen varlabel=""
-replace varlabel = "Potential Output Growth (constant 2010 U.S. dollars)" if mnemonic=="PGDP"
-replace varlabel = "GDP growth (constant 2010 LCU, percentage change)" if mnemonic=="GDPZ"
-replace varlabel = "Inflation (consumer price index 2000 = 100, percentage change)" if mnemonic=="CPIZ"
-replace varlabel = "Output gap (percentage of potential output)" if mnemonic=="GAP_"
-replace varlabel = "Current account balance (percentage share of nominal GDP)" if mnemonic=="CAB_"
-replace varlabel = "General government balance (% of nominal GDP)" if mnemonic=="DEFICIT_"
-replace varlabel = "General government gross debt (% of nominal GDP)" if mnemonic=="DEBT_"
-replace varlabel = "Private consumption growth (constant 2010 LCU, percentae change)" if mnemonic=="CONZ"
-replace varlabel = "Government consumption growth (constant 2010 LCU, percentage change)" if mnemonic=="GOVZ"
-replace varlabel = "Fixed investment growth (constant 2010 LCU, percentage change)" if mnemonic=="INVZ"
-replace varlabel = "Exports growth (constant 2010 LCU, percentage change)" if mnemonic=="EXPZ"
-replace varlabel = "Imports growth (constant 2010 LCU, percentage change)" if mnemonic=="IMPZ"
-replace varlabel = "Private consumption growth (percentage share of real GDP)" if mnemonic=="R_CON"
-replace varlabel = "Government consumption growth (percentage share of real GDP)" if mnemonic=="R_GOV"
-replace varlabel = "Fixed investment growth (percentage share of real GDP)" if mnemonic=="R_INV"
-replace varlabel = "Fixed investment (percentage share of real GDP)" if mnemonic=="R_STKB"
-replace varlabel = "Exports growth (percentage share of real GDP)" if mnemonic=="R_EXPZ"
-replace varlabel = "Imports growth (percentage share of real GDP)" if mnemonic=="R_IMPZ"
-replace varlabel = "Statistical discrepancy (percentage share of real GDP)" if mnemonic=="R_DISC"
-replace varlabel = "GDP deflator (baseyear = 2010, percentage change)" if mnemonic=="GDPZX"
-replace varlabel = "Private consumption deflator (baseyear = 2010, percentage change)" if mnemonic=="CONZX"
-replace varlabel = "Government consumption deflator (baseyear = 2010, percentage change)" if mnemonic=="GOVZX"
-replace varlabel = "Fixed investment deflator (baseyear = 2010, percentage change)" if mnemonic=="INVZX"
-replace varlabel = "Exports deflator (baseyear = 2010, percentage change)" if mnemonic=="EXPZX"
-replace varlabel = "Imports deflator (baseyear = 2010, percentage change)" if mnemonic=="IMPZX"
-replace varlabel = "GDP at factor cost growth (constant 2010 LCU, percentage change)" if mnemonic=="GDPFC"
-replace varlabel = "Taxes growth (constant 2010 LCU, percentage change)" if mnemonic=="TAXFC"
-replace varlabel = "Agricultural growth (constant 2010 LCU, percentage change)" if mnemonic=="AGRFC"
-replace varlabel = "Industry growth (constant 2010 LCU, percentage change)" if mnemonic=="INDFC"
-replace varlabel = "Services growth (constant 2010 LCU, percentage change)" if mnemonic=="SRVFC"
-replace varlabel = "Taxes (percentage share of real GDP at factor cost)" if mnemonic=="R_TAXFC"
-replace varlabel = "Agriculture (percentage share of real GDP at factor cost)" if mnemonic=="R_AGRFC"
-replace varlabel = "Industry (percentage share of real GDP at factor cost)" if mnemonic=="R_INDFC"
-replace varlabel = "Services (percentage share of real GDP at factor cost)" if mnemonic=="R_SRVFC"
-replace varlabel = "GDP at factor cost deflator (baseyear = 2010, percentage change)" if mnemonic=="GDPFCX"
-replace varlabel = "Tax deflator (baseyear = 2010, percentage change)" if mnemonic=="TAXFCX"
-replace varlabel = "Agriculture deflator (baseyear = 2010, percentage change)" if mnemonic=="AGRFCX"
-replace varlabel = "Industry deflator (baseyear = 2010 percentage change)" if mnemonic=="INDFCX"
-replace varlabel = "Services deflator (baseyear = 2010, percentage change)" if mnemonic=="SRVFCX"
-replace varlabel = "Labor force growth (percentae change %)" if mnemonic=="LABZ"
-replace varlabel = "Total factor productivity growth (percentage change %)" if mnemonic=="TFPZ"
-replace varlabel = "Capital stock growth (percentage change %)" if mnemonic=="STKZ"
-replace varlabel = "Potential GDP growth (constant 2010 LCU, percentage change)" if mnemonic=="PGDPZ"
-replace varlabel = "Labor force (contribution, percentage points %p)" if mnemonic=="C_LABZ"
-replace varlabel = "Total factor productiity (contribution, percentage points %p)" if mnemonic=="C_TFPZ"
-replace varlabel = "Capital stock (contribution, percentage points %p)" if mnemonic=="C_STKZ"
-replace varlabel = "Potential GDP growth (constant 2010 LCU, percentage change)" if mnemonic=="C_PGDPZ"
-replace varlabel = "Capital and financial account balance (percentage share of nominal GDP)" if mnemonic=="CAF_"
-replace varlabel = "Financial account balance, excl. R.A. (percentage share of nominal GDP)" if mnemonic=="FINX_"
-replace varlabel = "Reserve asset changes [R.A.] (percentage share of nominal GDP)" if mnemonic=="RACG_"
-replace varlabel = "Net errors and omissions (percentage share of nominal GDP)" if mnemonic=="NEOM_"
-replace varlabel = "Capital account balance (percentage share of nominal GDP)" if mnemonic=="CAP_"
-replace varlabel = "Financial account balance (percentage share of nominal GDP)" if mnemonic=="FINT_"
-replace varlabel = "Foreign direct investment balance (percentage share of nominal GDP)" if mnemonic=="FDI_"
-replace varlabel = "Portfolio investment balance, equity (percentage share of nominal GDP)" if mnemonic=="PFE_"
-replace varlabel = "Portfolio investment balance, debt (percentae share of nominal GDP)" if mnemonic=="PFD_"
-replace varlabel = "Other investment balance (percentage share of nominal GDP)" if mnemonic=="OTHR_"
-replace varlabel = "Export market (percentage change %)" if mnemonic=="XMKT"
-replace varlabel = "Nominal exchange rate (local currency per USD)" if mnemonic=="PANUSATLS"
-replace varlabel = "Nominal effective exchange rate (2010 = 100)" if mnemonic=="NEER"
-replace varlabel = "Real effective exchange rate (2010 = 100)" if mnemonic=="REER"
-	
-split varlabel, p(" (")
-
-rename varlabel1 title
-rename varlabel2 subtitle
-replace subtitle = "(" +  subtitle
-
-save "${cpath}/MPO Check data All countries.dta", replace
+if (c(os)=="MacOSX"|c(os)=="Unix") {
+	noi di ""
+	noi di as text `"Note: MacOSX/Unix, reading MFMOD Check. Data should exist alreay in the "$data_in/DLW" folder"'
+}
 
 }
 

@@ -9,7 +9,7 @@
 	*===========================================================================
 	* Save global with household survey to use
 	*===========================================================================
-	local year = $baseyear
+	local allyears = $baseyear
 
 	*===========================================================================
 	* Bring CPI
@@ -18,6 +18,9 @@
 	local code="$country"
 	local year0=$baseyear
 	local cpiversion="09"	
+	
+	* Make DLW directory
+	cap mkdir "$data_in/DLW"
 	
 	* Download CPI from datalibweb, in Windows
 	if "`c(os)'"=="Windows" {
@@ -28,10 +31,10 @@
 				noi di as error "Note: Downloading data from datalibweb failed. Verify connection"
 				exit
 			}
-			else save "$data_in/datalib_support_2005_GMDRAW.dta", replace
+			else save "$data_in/DLW/datalib_support_2005_GMDRAW.dta", replace
 		}
 		if "$reload_dlw"=="" {
-			cap use "$data_in/datalib_support_2005_GMDRAW.dta", clear
+			cap use "$data_in/DLW/datalib_support_2005_GMDRAW.dta", clear
 			if _rc {
 				noi di as error "CPI data not found. Download it using datalibweb in Windows"
 				exit
@@ -42,9 +45,9 @@
 	* Read CPI in MacOSX
 	if (c(os)=="MacOSX"|c(os)=="Unix") {
 		noi di ""
-		noi di as text "Note: MacOSX/Unix, datalibweb skipped. CPI data should exist alreay in the Data/ folder"
+		noi di as text `"Note: MacOSX/Unix, datalibweb skipped. CPI data should exist alreay in the "$data_in/DLW" folder"'
 		
-		cap use "$data_in/datalib_support_2005_GMDRAW.dta", clear
+		cap use "$data_in/DLW/datalib_support_2005_GMDRAW.dta", clear
 		if _rc {
 			noi di as error "CPI data not found. Download it using datalibweb in Windows"
 			exit
@@ -66,17 +69,17 @@
 		if c(os)=="Windows" {
 		
 		if "$reload_dlw"=="yes" {
-			foreach module in LBR INC IND {
-				cap datalibweb, country(BGD) year(2022) type(SARMD) vermast(02) veralt(02) survey(HIES) module(`module') clear
+			foreach module in LBR INC IND GMD {
+				cap datalibweb, country(BGD) year(2022) type(SARMD) vermast(02) veralt(03) survey(HIES) module(`module') clear
 				if _rc {
 					noi di as text "Note: file not found in datalibweb"
-					global `module' "$data_in/HIES 2022/BGD_2022_HIES_v02_M_v02_A_SARMD_`module'.dta"
+					exit
 				}
 			
 				else {
-					save "$data_in/HIES 2022/`r(filename)'", replace
-					noi di "`r(filename)'"	// BGD_2022_HIES_v02_M_v02_A_SARMD_LBR.dta
-					global `module' "$data_in/HIES 2022/`r(filename)'"
+					save "$data_in/DLW/`r(filename)'", replace
+					noi di "`r(filename)'"
+					global `module' "$data_in/DLW/`r(filename)'"
 				}
 			}
 		}
@@ -84,8 +87,8 @@
 		if "$reload_dlw"=="" {
 			noi di ""
 			noi di as text "Windows, datalibweb skipped"
-			foreach module in LBR INC IND {
-				global `module' "$data_in/HIES 2022/BGD_2022_HIES_v02_M_v02_A_SARMD_`module'.dta"
+			foreach module in LBR INC IND GMD {
+				global `module' "$data_in/DLW/BGD_2022_HIES_v02_M_v03_A_SARMD_`module'.dta"
 			}
 		}
 		
@@ -95,7 +98,7 @@
 			noi di ""
 			noi di as text "MacOSX, datalibweb skipped"
 			foreach module in LBR INC IND {	
-				global `module' "$data_in/HIES 2022/BGD_2022_HIES_v02_M_v02_A_SARMD_`module'.dta"
+				global `module' "$data_in/DLW/BGD_2022_HIES_v02_M_v03_A_SARMD_`module'.dta"
 			}
 		}
 	}
