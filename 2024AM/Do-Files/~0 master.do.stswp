@@ -41,7 +41,7 @@ etime, start
 	cd "$path"
 	
 * Do-files path
-	gl thedo     "$path/Do-files" // Do-files path
+	global dofiles     "$path/Do-files" // Do-files path
 
 * Globals for country and year identification
 	global country BGD 			// Country to upload
@@ -61,11 +61,16 @@ etime, start
 	gl random_remittances "no" // Change for "yes" or "no" on modelling
 	gl baseyear 2022
 	
-* Databases
-	global reload_dlw 	 ""		// if yes, reloads databases from datalibweb
-	local  loadhhdata ""		// if yes, save dta for Simulation (forced for sequential mode)
-	local  runsim	  "yes" 	// Run simulations
+* Steps
+	* Step 1: Load base household survey data for simulation
+	local  step1_loadhhdata ""		// if yes, save dta for Simulation (forced for sequential mode)
+		global reload_dlw 	 ""		// if yes, reloads databases from datalibweb
 
+	* Step 2: Run elasticity tool
+	local step2_macromicroinputs "yes"	// If yes, loads macro and micro inputs needed for simulation
+
+	* Step 3: Run simulation
+	local  step3_runsim	  "" 	// Run simulations	
 
 * Initial and final year for sequential run
 	local iniyear = 2027	// Initial year when doing sequential runs
@@ -98,7 +103,7 @@ etime, start
 
 		* Create batch files in MacOSX with sed function
 		if "`parallel'"=="yes" & (c(os)=="MacOSX"|c(os)=="Unix") {
-			cd "$thedo"
+			cd "$dofiles"
 			
 			* Create myscript.sh
 			cap erase myscript.sh
@@ -132,7 +137,7 @@ etime, start
 		
 		* Create batch files in Windows with powershell
 		if "`parallel'"=="yes" & c(os)=="Windows" {
-			cd "$thedo"
+			cd "$dofiles"
 			
 			* Create myscript.sh
 			cap erase myscript.bat
@@ -166,30 +171,36 @@ etime, start
 }
 
 *===============================================================================
-* Load and save household survey
+* Step 1: Load and save household survey for simulation
 * The process must be done before simulation steps.
 * Here, we force it to be run only during sequential runs.
 * Running it in parallel mode can create problems when the same file is being 
 * saved by each parallel instance.
 * This happens more often in Windows environments.
 *===============================================================================
-if "`loadhhdata'"=="yes" & "`parallel'"=="" {
+if "`step1_loadhhdata'"=="yes" & "`parallel'"=="" {
 	
 	* 000. Load data
-	do "$thedo/000_load_data.do"
-
-	* 001. Macro standard-MPO shares to Tableau
-	do "$thedo/001_sar_mpo_tableau_dashboard.do"
-	
-	* 002. Macro custom made MPO shares
-	do "$thedo/002_sar_mpo_tableau_dashboard.do" // does not exist yet
-	
-	* 003. Micro volumes for elasticies
-	do "$thedo/003_sar_micro_wages_and_volumes.do"
-	
-	* Save
+	do "$dofiles/000_load_data.do"
 	save "$data_root/BGD_2022_HIES_v02_M_v02_A_SARMD_SIM.dta", replace
+
+}
+
+*===============================================================================
+* Step 2: Calculates simulation parameters from macro and micro databases
+* The process must be done before simulation steps.
+* Here, we force it to be run only during sequential runs.
+*===============================================================================
+if "`step2_macromicroinputs'"=="yes" & "`parallel'"=="" {
 	
+	* 001. Process standard-MFMod parameters for Tableau
+	*do "$dofiles/001_sar_mpo_tableau_dashboard.do"
+	
+	* 002. Process custom-made MFMod parameters for Tableau
+	*do "$dofiles/002_sar_mpo_tableau_dashboard.do" // does not exist yet
+	
+	* 003. Elaticity tool based on HEIS and LFS
+	do "$dofiles/003_masterelasticity.do"
 }
 *===========================================================================
 * run dofiles
@@ -205,11 +216,11 @@ if "`runsim'"=="yes" {
 		global sim_year = `yyyy'
 		
 		* Load auxiliary simulation programs
-		local files : dir "$thedo/auxcode" files "*.do"
+		local files : dir "$dofiles/auxcode" files "*.do"
 		di `files'
 		foreach f of local files{
 			dis in yellow "`f'"
-			qui: run "$thedo/auxcode/`f'"
+			qui: run "$dofiles/auxcode/`f'"
 		}
 
 		* Use base household survey
@@ -219,33 +230,33 @@ if "`runsim'"=="yes" {
 		gl inputs   "$data_in/Macro and elasticities/Inputs elasticities `yyyy'.xlsx" // Country's input Excel file
 
 		* 010.input parameters
-			do "$thedo/010_parameters.do"
+			do "$dofiles/010_parameters.do"
 		* 020.prepare variables
-			do "$thedo/020_variables.do"
+			do "$dofiles/020_variables.do"
 		* 030.model labor incomes by groups
-			do "$thedo/030_occupation.do"
+			do "$dofiles/030_occupation.do"
 		* 040.model labor incomes by skills
-			do "$thedo/040_labor_income.do"
+			do "$dofiles/040_labor_income.do"
 		* 050.modeling population growth
-			do "$thedo/050_population.do"
+			do "$dofiles/050_population.do"
 		* 060.modeling labor activity rate
-			do "$thedo/060_activity.do"
+			do "$dofiles/060_activity.do"
 		* 070.modeling unemployment rate
-			do "$thedo/070_unemployment.do"
+			do "$dofiles/070_unemployment.do"
 		* 080.modeling changes in employment by sectors
-			do "$thedo/080_struct_emp.do"
+			do "$dofiles/080_struct_emp.do"
 		* 090.modeling labor income by sector
-			do "$thedo/090_asign_labor_income.do"	
+			do "$dofiles/090_asign_labor_income.do"	
 		* 100.income growth by sector
-			if "$re_scale" == "yes" do "$thedo/100_income_rel_new.do"
-			if "$re_scale" == ""    do "$thedo/101_income_rel_new_no_rescaling.do"
+			if "$re_scale" == "yes" do "$dofiles/100_income_rel_new.do"
+			if "$re_scale" == ""    do "$dofiles/101_income_rel_new_no_rescaling.do"
 		* 110. total labor incomes
-			do "$thedo/110_total_income.do"	
+			do "$dofiles/110_total_income.do"	
 		* 120. total non-labor incomes
-			if "$random_remittances" == "no"  do "$thedo/120_assign_nlai.do"
-			if "$random_remittances" == "yes" do "$thedo/121_assign_nlai.do"
+			if "$random_remittances" == "no"  do "$dofiles/120_assign_nlai.do"
+			if "$random_remittances" == "yes" do "$dofiles/121_assign_nlai.do"
 		* 130. household income
-			do "$thedo/130_household_income.do"
+			do "$dofiles/130_household_income.do"
 
 		* Quick summary
 			ineqdec0 pc_inc_s  [w=fexp_s]
