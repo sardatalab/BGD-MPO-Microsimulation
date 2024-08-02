@@ -27,7 +27,7 @@ etime, start
 *===============================================================================
 {
 * Step 1: Load base household survey data for simulation
-	local  step1_loadhhdata ""		// if yes, save simulation data
+	local  step1_loadhhdata  ""		// if yes, save simulation data
 		global reload_dlw 	 ""		// SUBOPTION: if yes, reloads databases from datalibweb
 
 * Step 2: Calculate macro-micro inputs, (aka elasticity tool)
@@ -190,7 +190,7 @@ etime, start
 if "`step1_loadhhdata'"=="yes" & "`parallel'"=="" {
 	
 	* 000. Load data
-	do "$dofiles/000_load_data.do"
+	do "$dofiles/001_load_data.do"
 	save "$data_root/BGD_2022_HIES_v02_M_v02_A_SARMD_SIM.dta", replace
 
 }
@@ -203,13 +203,17 @@ if "`step1_loadhhdata'"=="yes" & "`parallel'"=="" {
 if "`step2_macromicroinputs'"=="yes" & "`parallel'"=="" {
 	
 	* 001. Process standard-MFMod parameters for Tableau
-	*do "$dofiles/001_sar_mpo_tableau_dashboard.do"
+	*do "$dofiles/002_sar_mpo_tableau_dashboard.do"
 	
 	* 002. Process custom-made MFMod parameters for Tableau
 	*do "$dofiles/002_sar_mpo_tableau_dashboard.do" // does not exist yet
 	
-	* 003. Elaticity tool based on HIES and LFS
+	* 003 (master) Elaticity tool based on HIES and LFS
+	* 004, 005, and 006 are called within 003
 	do "$dofiles/003_masterelasticity.do"
+	
+	* 007 Update United Nations World Population Prospects
+	do "$dofiles/007_import_un_wpp.do"
 }
 *===========================================================================
 * run dofiles

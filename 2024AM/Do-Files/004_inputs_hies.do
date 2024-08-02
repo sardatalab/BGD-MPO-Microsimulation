@@ -101,19 +101,6 @@ foreach country of global countries_hies { // Open loop countries
 				6 "Rest of Services";
 			#delimit cr
 			label values industry_imp lblindustry_imp
-		/* industrycat10_year
-		   1 Agriculture, Hunting, Fishing, etc.
-           2 Mining
-           3 Manufacturing
-           4 Public Utility Services
-           5 Construction
-           6 Commerce
-           7 Transport and Communications
-           8 Financial and Business Services
-           9 Public Administration
-          10 Others Services, Unspecified
-		*/
-
 		
 		* Labor income - s0/s1 by sector and total
 		*******************************************************
@@ -144,8 +131,6 @@ foreach country of global countries_hies { // Open loop countries
 		}
 		}
 		
-		
-		
 		* Estimations
 		****************
 		
@@ -155,22 +140,22 @@ foreach country of global countries_hies { // Open loop countries
 		* Total population
 		sum poptotal [w=wgt]
 		local poptotal = `r(sum_w)'
-		post `mypost' ("`country'") (`year') ("poptotal") ("Population, total") (`poptotal') 
+		post `mypost' ("`country'") (`year') ("hspop_total") ("Population, total") (`poptotal') 
 
 		* Population 00-14
 		sum pop0014 [w=wgt]
 		local pop0014 = `r(sum_w)'*`r(mean)'
-		post `mypost' ("`country'") (`year') ("pop0014") ("Population, 00-14") (`pop0014')
+		post `mypost' ("`country'") (`year') ("hspop_0014") ("Population, 00-14") (`pop0014')
 		
 		* Population 15-64
 		sum pop1564 [w=wgt]
 		local pop1564 = `r(sum_w)'*`r(mean)'
-		post `mypost' ("`country'") (`year') ("pop1564") ("Population, 15-64") (`pop1564')
+		post `mypost' ("`country'") (`year') ("hspop_1564") ("Population, 15-64") (`pop1564')
 		
 		* Population 65+
 		sum pop65up [w=wgt]
 		local pop65up = `r(sum_w)'*`r(mean)'
-		post `mypost' ("`country'") (`year') ("pop65up") ("Population, 65+") (`pop65up')
+		post `mypost' ("`country'") (`year') ("hspop_65up") ("Population, 65+") (`pop65up')
 		
 		* Not in the labor force
 		sum lstatus_year [w=wgt] if lstatus_year == 3 & sample == 1
@@ -209,7 +194,7 @@ foreach country of global countries_hies { // Open loop countries
 		************************
 		qui sum ip_total [w=wgt]
 		local ip_total = `r(mean)'
-		post `mypost' ("`country'") (`year') ("iptotal") ("IP All") (`ip_total')
+		post `mypost' ("`country'") (`year') ("ip_total") ("IP All") (`ip_total')
 
 		foreach s of local alls {
 		foreach a of local alla {
@@ -234,13 +219,81 @@ foreach country of global countries_hies { // Open loop countries
 	use  `myresults', clear
 	
 	compress
-	save "$data_in/Tableau/AM_24 MPO Check/input-labor-heis.dta", replace
-	save "$data_in/Tableau/AM_24 MPO Check/version_control/input-labor-sedlac `c(current_date)' `c(current_time)'.dta", replace
+	save "$data_in/Tableau/AM_24 MPO Check/input-labor-hies.dta", replace
+	save "$data_in/Tableau/AM_24 MPO Check/version_control/input-labor-hies `c(current_date)' `c(current_time)'.dta", replace
 	
 	export excel using "$data_in/Macro and elasticities/Working Input Elasticities.xlsx", sheet("input-labor-hies", replace) firstrow(variables)
 	export excel using "$data_in/Macro and elasticities/Working Input Elasticities.xlsx", sheet("input-labor-hies", replace) firstrow(variables)
 
+	
+	use "$data_in/Tableau/AM_24 MPO Check/input-labor-hies.dta", clear 
+	
+	* mnemonic
+	rename variable mnemonic
 
+	* indicatorid
+	gen indicatorid=.
+		replace indicatorid = 201 if mnemonic=="hspop_0014"
+		replace indicatorid = 202 if mnemonic=="hspop_1564"
+		replace indicatorid = 203 if mnemonic=="hspop_65up"
+		replace indicatorid = 204 if mnemonic=="hspop_total"
+		
+		replace indicatorid = 205 if mnemonic=="lstatus1_1564"
+		replace indicatorid = 206 if mnemonic=="lstatus2_1564"
+		replace indicatorid = 207 if mnemonic=="lstatus3_1564"		
+		replace indicatorid = 208 if mnemonic=="lstatus12_1564"
+		
+		replace indicatorid = 209 if mnemonic=="lstatus1_s0_a1"
+		replace indicatorid = 210 if mnemonic=="lstatus1_s0_a2"
+		replace indicatorid = 211 if mnemonic=="lstatus1_s0_a3"
+		replace indicatorid = 212 if mnemonic=="lstatus1_s0_a4"
+		replace indicatorid = 213 if mnemonic=="lstatus1_s0_a5"
+		replace indicatorid = 214 if mnemonic=="lstatus1_s0_a6"
+		replace indicatorid = 215 if mnemonic=="lstatus1_s1_a1"
+		replace indicatorid = 216 if mnemonic=="lstatus1_s1_a2"
+		replace indicatorid = 217 if mnemonic=="lstatus1_s1_a3"
+		replace indicatorid = 218 if mnemonic=="lstatus1_s1_a4"
+		replace indicatorid = 219 if mnemonic=="lstatus1_s1_a5"
+		replace indicatorid = 220 if mnemonic=="lstatus1_s1_a6"
+		
+		replace indicatorid = 221 if mnemonic=="ip_s0_a1"
+		replace indicatorid = 222 if mnemonic=="ip_s0_a2"
+		replace indicatorid = 223 if mnemonic=="ip_s0_a3"
+		replace indicatorid = 224 if mnemonic=="ip_s0_a4"
+		replace indicatorid = 225 if mnemonic=="ip_s0_a5"
+		replace indicatorid = 226 if mnemonic=="ip_s0_a6"
+		replace indicatorid = 227 if mnemonic=="ip_s1_a1"
+		replace indicatorid = 228 if mnemonic=="ip_s1_a2"
+		replace indicatorid = 229 if mnemonic=="ip_s1_a3"
+		replace indicatorid = 230 if mnemonic=="ip_s1_a4"
+		replace indicatorid = 231 if mnemonic=="ip_s1_a5"
+		replace indicatorid = 232 if mnemonic=="ip_s1_a6"
+		replace indicatorid = 233 if mnemonic=="ip_total"
+		
+	* varlabel
+	rename Indicator varlabel
+	
+	* title
+	gen title = ""
+	replace title = "Population" if substr(mnemonic,1,2)=="hs"
+	replace title = "Labor" 	 if substr(mnemonic,1,2)=="ls"
+	replace title = "Income" 	 if substr(mnemonic,1,2)=="ip"
+	
+	* value and subtitle
+	rename Value value
+	replace value = value/10^6    if substr(mnemonic,1,2)=="hs"
+	replace value = value/10^6    if substr(mnemonic,1,2)=="ls"
+	gen subtitle = ""
+	replace subtitle = "millions" if substr(mnemonic,1,2)=="hs"
+	replace subtitle = "millions" if substr(mnemonic,1,2)=="ls"
+	replace subtitle = "daily, PPP$"
+	
+	* topicid
+	indicatorid topicid topicname sectorid sectorname
+	
+	
+	
+sdfdsfds
 /*************************************************************************
 * 	3 - ELASTICITIES INPUTS
 *************************************************************************

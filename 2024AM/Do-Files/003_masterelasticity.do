@@ -54,11 +54,11 @@ local quarters "q01 q02 q03 q04"
 * Set up Elasticities
 ************************
 * Countries to include and their RESPECTIVE year restriction
-gl countries 	"BGD  ARG" 
-gl min_year 	"2010 2006" // Long series
-gl min_year2 	"2016 2011" // Middle series
-gl min_year3 	"2016 2015" // Short Series
-gl last_year 	"2022 2019" // Last year
+gl countries 	"BGD" 
+gl min_year 	"2010" // Long series
+gl min_year2 	"2016" // Middle series
+gl min_year3 	"2016" // Short Series
+gl last_year 	"2022" // Last year
 
 
 
@@ -68,18 +68,12 @@ gl last_year 	"2022 2019" // Last year
 
 * 1. inputs using HIES				  
 	do "$dofiles/004_inputs_hies.do"
-	dddd
+
 * 2. inputs using LFS
-	do "$dofiles/005_inputs_lfs.do"
-	
-* 3. inputs using Microsimulated data
-	do "$dofiles/006_inputs_microsims.do"
-	
+	*do "$dofiles/005_inputs_lfs.do"
+		
 * 4. elasticities
-	do "$dofiles/007_elasticities.do"
-	
-* 5. GDP and Population
-	do "$dofiles/008_inputs_macro.do" // This one is Cicero's old do with Rodrigo's improvements
+	*do "$dofiles/006_elasticities.do"
 	
 	
 *************************************************************************
