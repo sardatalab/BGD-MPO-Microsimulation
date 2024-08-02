@@ -23,6 +23,36 @@ etime, start
 *===============================================================================
 
 *===============================================================================
+* RUNNING STEPS
+*===============================================================================
+{
+* Step 1: Load base household survey data for simulation
+	local  step1_loadhhdata ""		// if yes, save simulation data
+		global reload_dlw 	 ""		// SUBOPTION: if yes, reloads databases from datalibweb
+
+* Step 2: Calculate macro-micro inputs, (aka elasticity tool)
+	local step2_macromicroinputs "yes"	// If yes, loads macro and micro inputs needed for simulation
+
+* Step 3: Run macro-micro simulation
+	local  step3_runsim	  "" 	// Run simulations	
+		
+	* Initial and final year for sequential run
+		local iniyear = 2027	// Initial year when doing sequential runs
+		local finyear = 2027	// Final year when doing sequential runs
+
+	* Local parallel
+		local parallel 	""	// If "yes", the program will run simulation parallel mode
+
+	* Parallel run set up
+		* If local parallel is set to "yes". Then n batch files will be created
+		* with the name batch_`i'.do located in the working directory.
+		* Select initial and final parallel years below	
+			local iniparallelyear = 2022	// First batch file to be created
+			local finparallelyear = 2027	// Last batch file to be created
+			local parallel_automatic "yes"  // If yes, parallel run will start automatically
+											// Otherwise, call the batch file from terminal or the command prompt
+}		
+*===============================================================================
 * PATHS - Modify according to your local route
 *===============================================================================
 {
@@ -43,16 +73,23 @@ etime, start
 * Do-files path
 	global dofiles     "$path/Do-files" // Do-files path
 
+* Data directories
+	cap mkdir "${path}/Data"
+	gl data_root "${path}/Data"
+	gl data_in   "${path}/Data/INPUT"
+	gl data_out  "${path}/Data/OUTPUT"
+
+}
+
+*===============================================================================
+* Country Parameters
+*===============================================================================
+{
 * Globals for country and year identification
 	global country BGD 			// Country to upload
 	global year 2022			// household survey year to use
 	global final_year 2027		// Last simulated year
 	global base_year 2022		// Base year for building LAVs
-	
-	cap mkdir "${path}/Data"
-	gl data_root "${path}/Data"
-	gl data_in   "${path}/Data/INPUT"
-	gl data_out  "${path}/Data/OUTPUT"
 
 * Parameters
 	*gl use_saved_parameters "yes" // Not working yet
@@ -61,39 +98,11 @@ etime, start
 	gl random_remittances "no" // Change for "yes" or "no" on modelling
 	gl baseyear 2022
 	
-* Steps
-	* Step 1: Load base household survey data for simulation
-	local  step1_loadhhdata ""		// if yes, save dta for Simulation (forced for sequential mode)
-		global reload_dlw 	 ""		// if yes, reloads databases from datalibweb
-
-	* Step 2: Run elasticity tool
-	local step2_macromicroinputs "yes"	// If yes, loads macro and micro inputs needed for simulation
-
-	* Step 3: Run simulation
-	local  step3_runsim	  "" 	// Run simulations	
-
-* Initial and final year for sequential run
-	local iniyear = 2027	// Initial year when doing sequential runs
-	local finyear = 2027	// Final year when doing sequential runs
-
-* Local parallel
-	local parallel 	""	// If "yes", the program will run in parallel mode
-	
 }
 *===============================================================================
-* Sub-options for parallel run, if enabled
+* Parallelization - Don't modify
 *===============================================================================
 {
-	
-* Parallel run set up
-	* If local parallel is set to "yes". Then n batch files will be created
-	* with the name batch_`i'.do located in the working directory.
-	* The iniyear and finyear locals above will be modified.	
-		local iniparallelyear = 2022	// First batch file to be created
-		local finparallelyear = 2027	// Last batch file to be created
-		local parallel_automatic "yes"  // If yes, parallel run will start automatically
-										// Otherwise, call from terminal
-		
 	* Parallel operationalization, do not modify
 	
 		scalar xrxx = 1			// Do not modify
@@ -172,7 +181,7 @@ etime, start
 
 *===============================================================================
 * Step 1: Load and save household survey for simulation
-* The process must be done before simulation steps.
+* The process must be done before starting the macro-micro simulation.
 * Here, we force it to be run only during sequential runs.
 * Running it in parallel mode can create problems when the same file is being 
 * saved by each parallel instance.
@@ -199,7 +208,7 @@ if "`step2_macromicroinputs'"=="yes" & "`parallel'"=="" {
 	* 002. Process custom-made MFMod parameters for Tableau
 	*do "$dofiles/002_sar_mpo_tableau_dashboard.do" // does not exist yet
 	
-	* 003. Elaticity tool based on HEIS and LFS
+	* 003. Elaticity tool based on HIES and LFS
 	do "$dofiles/003_masterelasticity.do"
 }
 *===========================================================================

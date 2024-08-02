@@ -1,6 +1,6 @@
 *!v1.0
 /*========================================================================
-Project:			Microsimulations Inputs from HEIS
+Project:			Microsimulations Inputs from HIES
 Institution:		World Bank
 
 Author:				Kelly Y. Montoya (kmontoyamunoz@worldbank.org)
@@ -19,11 +19,11 @@ drop _all
 * Set up postfile for results
 tempname mypost
 tempfile myresults
-postfile `mypost' str12(Country) Year str40(Indicator) Value using `myresults', replace
+postfile `mypost' str12(country) year str40(variable) str40(Indicator) Value using `myresults', replace
 
 
 *************************************************************************
-* 	1 - HEIS DATA
+* 	1 - HIES DATA
 *************************************************************************
 
 foreach country of global countries_hies { // Open loop countries
@@ -42,69 +42,108 @@ foreach country of global countries_hies { // Open loop countries
 			di in red "`country' `year' NOT loaded in datalib"
 			use "$data_root/BGD_2022_HIES_v02_M_v02_A_SARMD_SIM.dta", clear
 		}
-			
-		* REMINDER: Always filter for coherent households.
+	
+		* Filter for coherent households.
 		*****************************************************
 		gen byte cohh = (welfare>0)
 		qui cap keep if cohh==1 & ipcf!=.
 		qui cap keep if ipcf!=.
 		
+		* Filter for coherent labor individuals.
+		*****************************************************
+		* Excluding the negative values and one outlier at the very top
+		gen byte cohi = (ip>0 & ip!=. & ip<9100000)
 		
 		* Defining sample 
 		********************
 		cap drop sample
-		qui gen sample = (lstatus_year==1 & age >= 15 & age < 64) 
+		qui gen sample    = (age >= 15 & age <= 64)
+		gen byte poptotal = 1
+		gen byte pop0014  = (age >= 0  & age <= 14)
+		gen byte pop1564  = (age >= 15 & age <= 64)
+		gen byte pop65up  = (age >= 65 & age != . )
 		
 		* Two types of workers s0 and s1
 		*********************************		
-		qui cap drop d_s0
-		qui gen d_s0 = .
+		qui cap drop d_s
+		qui gen d_s = .
+			replace d_s = 1 if occup_year>=1 & occup_year<=3 & lstatus_year==1 & sample==1
+			replace d_s = 0 if occup_year>=4 & occup_year!=. & lstatus_year==1 & sample==1
+			replace d_s = 0 if occup_year==. & educy<=9             & lstatus_year==1 & sample==1
+			replace d_s = 1 if occup_year==. & educy>=10 & educy!=. & lstatus_year==1 & sample==1
+			replace d_s = 0 if occup_year==. & educy==. 			& lstatus_year==1 & sample==1
+		label define lbld_s 0 "Unskilled" 1 "Skilled"
+		label values d_s lbld_s
+
+		* lstatus
+		replace lstatus_year = 2 if lstatus==2 & lstatus_year==. & sample==1
+		replace lstatus_year = 3 if lstatus==3 & lstatus_year==. & sample==1
+		replace lstatus_year = 3 if lstatus_year==. 		     & sample==1
 		
-		** BGD
-		if inlist("`country'","BGD") {
-			qui replace d_s0 = 1 if occup_year>=4 & occup_year!=. & lstatus_year==1
-			qui replace d_s0 = 0 if occup_year>=1 & occup_year<=3 & lstatus_year==1
-		} 
-		
-}
-		
-		
-		* Sector main occupation
+		* Industry main occupation
+		* activities a = {1..n}
 		***************************
+		gen industry_imp = .
+			replace industry_imp = 1 if industrycat10_year==1	// agriculture
+			replace industry_imp = 2 if industrycat10_year==5	// construction
+			replace industry_imp = 3 if industrycat10_year==2|industrycat10_year==3	// rest of industry			
+			replace industry_imp = 4 if industrycat10_year==7	// transport
+			replace industry_imp = 5 if industrycat10_year==8	// financial
+			replace industry_imp = 6 if industrycat10_year==4|industrycat10_year==6|industrycat10_year==9|industrycat10_year==10
+			replace industry_imp = 6 if industrycat10_year==. & lstatus_year==1 // 7 observations
+			#delimit ;
+			label define lblindustry_imp 
+				1 "Agriculture"
+				2 "Construction"
+				3 "Rest of Industry"
+				4 "Transport"
+				5 "Finance"
+				6 "Rest of Services";
+			#delimit cr
+			label values industry_imp lblindustry_imp
+		/* industrycat10_year
+		   1 Agriculture, Hunting, Fishing, etc.
+           2 Mining
+           3 Manufacturing
+           4 Public Utility Services
+           5 Construction
+           6 Commerce
+           7 Transport and Communications
+           8 Financial and Business Services
+           9 Public Administration
+          10 Others Services, Unspecified
+		*/
+
 		
-		*Important!!! check this definition for all countries - some do not have sector1d but sector
+		* Labor income - s0/s1 by sector and total
+		*******************************************************
+		gen double welfare_ppp17 = ((12/365)*welfarenat/cpi2017/icp2017)
+		gen double ip_ppp17 = ((12/365)* ip/cpi2017/icp2017) if cohi == 1 // Labor income main activity ppp 2017
 		
-		if "`country'" == "PRY" {
-			qui recode sector (1=1 "Agriculture") (2 3 4 =2 "Industry") (5 6 7 8 9 10 =3 "Services") , gen(sector_3)
-		} // This is new. PRY doesn't have available the variable sector1d from 2014 on.
-		else {
-			qui recode sector1d (1 2 =1 "Agriculture") (3 4 5 6 =2 "Industry") (7 8 9 10 11 12 13 14 15 16 17 =3 "Services"), gen(sector_3)
+		
+		levelsof d_s, local(alls)
+		levelsof industry_imp, local(alla)
+		foreach s of local alls {
+		foreach a of local alla {
+		
+			qui gen ip_s`s'_a`a' = ip_ppp17 if sample == 1 & lstatus_year==1 & industry_imp == `a' & d_s == `s' 
+			
+		}
 		}
 		
-
-		* Labor income - formal/informal by sector and total
-		*******************************************************
-		qui gen ip_ppp17 = ip * (ipc17_sedlac / ipc_sedlac) / (ppp17 * conversion) if cohi == 1 // Labor income main activity ppp 2017
-		
-		qui gen ip_s1_ag = ip_ppp17 if sample == 1 & ocupado == 1 & sector_3 == 1 & d_s0 == 0 
-		qui gen ip_s0_ag = ip_ppp17 if sample == 1 & ocupado == 1 & sector_3 == 1 & d_s0 == 1 
-		qui gen ip_s1_ind = ip_ppp17 if sample == 1 & ocupado == 1 & sector_3 == 2 & d_s0 == 0 
-		qui gen ip_s0_ind = ip_ppp17 if sample == 1 & ocupado == 1 & sector_3 == 2 & d_s0 == 1 
-		qui gen ip_s1_ser = ip_ppp17 if sample == 1 & ocupado == 1 & sector_3 == 3 & d_s0 == 0 
-		qui gen ip_s0_ser = ip_ppp17 if sample == 1 & ocupado == 1 & sector_3 == 3 & d_s0 == 1
-		qui gen ip_total = ip_ppp17 if sample == 1 & ocupado == 1 
-		qui gen ip_s1 = ip_ppp17 if sample == 1 & ocupado == 1 & d_s0 == 0 
-		qui gen ip_s0 = ip_ppp17 if sample == 1 & ocupado == 1 & d_s0 == 1
+		qui gen ip_total  = ip_ppp17 if sample == 1 & lstatus_year==1
+		qui gen ip_s1     = ip_ppp17 if sample == 1 & lstatus_year==1 & d_s == 1 
+		qui gen ip_s0 	  = ip_ppp17 if sample == 1 & lstatus_year==1 & d_s == 0
 
 		
 		* Number of workers - formal/informal by sector
 		**************************************************
-		qui gen ocupado_s1_ag = (sample == 1 & ocupado == 1 & sector_3 == 1 & d_s0 == 0)
-		qui gen ocupado_s0_ag = (sample == 1 & ocupado == 1 & sector_3 == 1 & d_s0 == 1 )
-		qui gen ocupado_s1_ind = (sample == 1 & ocupado == 1 & sector_3 == 2 & d_s0 == 0 )
-		qui gen ocupado_s0_ind = (sample == 1 & ocupado == 1 & sector_3 == 2 & d_s0 == 1 )
-		qui gen ocupado_s1_ser =  (sample == 1 & ocupado == 1 & sector_3 == 3 & d_s0 == 0)
-		qui gen ocupado_s0_ser = (sample == 1 & ocupado == 1 & sector_3 == 3 & d_s0 == 1)
+		foreach s of local alls {
+		foreach a of local alla {
+			qui gen lstatus1_s`s'_a`a'  = (sample == 1 & lstatus_year==1 & industry_imp == `a' & d_s == `s')
+		}
+		}
+		
 		
 		
 		* Estimations
@@ -114,96 +153,75 @@ foreach country of global countries_hies { // Open loop countries
 		***********************
 
 		* Total population
-		qui sum pea [w=pondera] if sample == 1
-		local pea = `r(sum_w)'
-		post `mypost' ("`country'") (`year') ("Total population") (`pea')
- 
-		* Active population
-		qui sum pea [w=pondera] if pea == 1 & sample == 1
-		local active = `r(sum_w)'
-		post `mypost' ("`country'") (`year') ("Active population") (`active')
+		sum poptotal [w=wgt]
+		local poptotal = `r(sum_w)'
+		post `mypost' ("`country'") (`year') ("poptotal") ("Population, total") (`poptotal') 
 
-		* Inactive population
-		qui sum pea [w=pondera] if pea == 0 & sample == 1 
-		local inactive = `r(sum_w)'
-		post `mypost' ("`country'") (`year') ("Inactive population") (`inactive')
-
-		* Workers
-		qui sum ocupado [w=pondera] if ocupado == 1 & sample == 1  
-		local employed = `r(sum_w)'
-		post `mypost' ("`country'") (`year') ("Working population") (`employed')
+		* Population 00-14
+		sum pop0014 [w=wgt]
+		local pop0014 = `r(sum_w)'*`r(mean)'
+		post `mypost' ("`country'") (`year') ("pop0014") ("Population, 00-14") (`pop0014')
+		
+		* Population 15-64
+		sum pop1564 [w=wgt]
+		local pop1564 = `r(sum_w)'*`r(mean)'
+		post `mypost' ("`country'") (`year') ("pop1564") ("Population, 15-64") (`pop1564')
+		
+		* Population 65+
+		sum pop65up [w=wgt]
+		local pop65up = `r(sum_w)'*`r(mean)'
+		post `mypost' ("`country'") (`year') ("pop65up") ("Population, 65+") (`pop65up')
+		
+		* Not in the labor force
+		sum lstatus_year [w=wgt] if lstatus_year == 3 & sample == 1
+		local lstatus3 = `r(sum_w)'
+		post `mypost' ("`country'") (`year') ("lstatus3_1564") ("Not in Labor Force") (`lstatus3')
 
 		* Unemployed
-		qui sum desocupa  [w=pondera] if desocupa == 1 & sample == 1 
-		local unemployed = `r(sum_w)'
-		post `mypost' ("`country'") (`year') ("Unemployed population") (`unemployed')
+		sum lstatus_year [w=wgt] if lstatus_year == 2 & sample == 1 
+		local lstatus2 = `r(sum_w)'
+		post `mypost' ("`country'") (`year') ("lstatus2_1564") ("Unemployed") (`lstatus2')
 
-		* Agriculture
-		qui sum ocupado_s1_ag [w=pondera] if ocupado_s1_ag==1
-		local ocuformag3 = `r(sum_w)'
-		post `mypost' ("`country'") (`year') ("Formal workers agriculture") (`ocuformag3')
-						
-		qui sum ocupado_s0_ag [w=pondera] if ocupado_s0_ag==1
-		local ocuinfag3 = `r(sum_w)'
-		post `mypost' ("`country'") (`year') ("Informal workers agriculture") (`ocuinfag3')
+		* Employment
+		sum lstatus_year [w=wgt] if lstatus_year == 1 & sample == 1  
+		local lstatus1 = `r(sum_w)'
+		post `mypost' ("`country'") (`year') ("lstatus1_1564") ("Employed") (`lstatus1')
 
-		* Industry		
-		qui sum ocupado_s1_ind [w=pondera] if ocupado_s1_ind==1
-		local ocuformind3 = `r(sum_w)'
-		post `mypost' ("`country'") (`year') ("Formal workers industry") (`ocuformind3')
-					
-		qui sum ocupado_s0_ind [w=pondera] if  ocupado_s0_ind==1
-		local ocuinfind3 = `r(sum_w)'
-		post `mypost' ("`country'") (`year') ("Informal workers industry") (`ocuinfind3')
+		* Labor Force
+		sum wgt if (lstatus_year == 1|lstatus_year==2) & sample == 1
+		local lstatus12 = `r(sum)'
+		post `mypost' ("`country'") (`year') ("lstatus12_1564") ("Labor Foce") (`lstatus12')
 
-		* Services	
-		qui sum ocupado_s1_ser [w=pondera] if ocupado_s1_ser==1
-		local ocuformser3 = `r(sum_w)'
-		post `mypost' ("`country'") (`year') ("Formal workers services") (`ocuformser3')
-
-		qui sum ocupado_s0_ser [w=pondera] if ocupado_s0_ser==1
-		local ocuinfser3 = `r(sum_w)'
-		post `mypost' ("`country'") (`year') ("Informal workers services") (`ocuinfser3')
-
+		* Number of workers, across industries and type of workers
+		foreach s of local alls {
+		foreach a of local alla {
+			qui sum lstatus1_s`s'_a`a'[w=wgt]
+			local lstatus1_s`s'_a`a' = `r(sum_w)'*`r(mean)'
+			
+			local laba : label lblindustry_imp `a'
+			local labs : label lbld_s `s'
+			
+			post `mypost' ("`country'") (`year') ("lstatus1_s`s'_a`a'") ("Workers `laba' `labs'") (`lstatus1_s`s'_a`a'')
+		}
+		}
 		
 		** Labor income (avg)
 		************************
-		qui sum ip_total [w=pondera]
-		local ocutot = `r(mean)'
-		post `mypost' ("`country'") (`year') ("Avg. income") (`ocutot')
+		qui sum ip_total [w=wgt]
+		local ip_total = `r(mean)'
+		post `mypost' ("`country'") (`year') ("iptotal") ("IP All") (`ip_total')
 
-		qui sum ip_s1 [w=pondera] 
-		local ocuform = `r(mean)'
-		post `mypost' ("`country'") (`year') ("Avg. formal income") (`ocuform')
-
-		qui sum ip_s0 [w=pondera] 
-		local ocuinf = `r(mean)'
-		post `mypost' ("`country'") (`year') ("Avg. informal income") (`ocuinf')
-
-		qui sum ip_s1_ag [w=pondera] 
-		local ocuformag = `r(mean)'
-		post `mypost' ("`country'") (`year') ("Avg. formal income agriculture") (`ocuformag')
-
-		qui sum ip_s0_ag [w=pondera] 
-		local ocuinfag = `r(mean)'
-		post `mypost' ("`country'") (`year') ("Avg. informal income agriculture") (`ocuinfag')
-				
-		qui sum ip_s1_ind [w=pondera] 
-		local ocuformind = `r(mean)'
-		post `mypost' ("`country'") (`year') ("Avg. formal income industry") (`ocuformind')
+		foreach s of local alls {
+		foreach a of local alla {
+			qui sum ip_s`s'_a`a' [w=wgt] 
+			local ip_s`s'_a`a' = `r(mean)'
 			
-		qui sum ip_s0_ind [w=pondera] 
-		local ocuinfind = `r(mean)'
-		post `mypost' ("`country'") (`year') ("Avg. informal income industry") (`ocuinfind')
-		
-		qui sum ip_s1_ser [w=pondera] 
-		local ocuformser = `r(mean)'
-		post `mypost' ("`country'") (`year') ("Avg. formal income services") (`ocuformser')
-
-		qui sum ip_s0_ser [w=pondera] 
-		local ocuinfser = `r(mean)'
-		post `mypost' ("`country'") (`year') ("Avg. informal income services") (`ocuinfser')
-
+			local laba : label lblindustry_imp `a'
+			local labs : label lbld_s `s'			
+			
+			post `mypost' ("`country'") (`year') ("ip_s`s'_a`a'") ("Mean income in `laba' `labs'") (`ip_s`s'_a`a'')
+		}
+		}
 
 		 di in red "`country' - `year' finished successfully"
 	
@@ -212,47 +230,18 @@ foreach country of global countries_hies { // Open loop countries
 } // Close loop countries
 
 
-postclose `mypost'
-use  `myresults', clear
-compress
-save "$path\input-labor-sedlac.dta", replace
-save "$path\inputs_version_control\input-labor-sedlac_${version}.dta", replace
-export excel using "$path_mpo/$outfile", sheet("input-labor-sedlac") sheetreplace firstrow(variables)
-export excel using "$path_share/$outfile", sheet("input-labor-sedlac") sheetreplace firstrow(variables)
-
-*************************************************************************
-* 	2 - MPO DATA
-*************************************************************************
-
-* Loading the MPO data
-use "$povmod", clear
-
-* Keep only countries of interest
-keep if inlist(countrycode,"ARG","BOL","BRA","CHL","COL","CRI","DOM") | inlist(countrycode,"ECU","SLV","HND","MEX","NIC","PER","PRY") | inlist(countrycode,"PAN","URY","GTM")
-
-* Keep last version
-tab date
-gen date1=date(date,"MDY")
-egen datem= max(date1)
-keep if date1 == datem
-tab date
-
-* Keep variables of interes
-keep year countrycode gdpconstant agriconstant indusconstant servconstant
-
-ren *constant Value*
-
-reshape long Value, i(country year) j(Indicator) string
-ren (countrycode year) (Country Year)
-
-order Country Year Indicator Value
-sort Country Year Indicator Value
-
-tempfile macrodata
-save `macrodata', replace
+	postclose `mypost'
+	use  `myresults', clear
+	
+	compress
+	save "$data_in/Tableau/AM_24 MPO Check/input-labor-heis.dta", replace
+	save "$data_in/Tableau/AM_24 MPO Check/version_control/input-labor-sedlac `c(current_date)' `c(current_time)'.dta", replace
+	
+	export excel using "$data_in/Macro and elasticities/Working Input Elasticities.xlsx", sheet("input-labor-hies", replace) firstrow(variables)
+	export excel using "$data_in/Macro and elasticities/Working Input Elasticities.xlsx", sheet("input-labor-hies", replace) firstrow(variables)
 
 
-*************************************************************************
+/*************************************************************************
 * 	3 - ELASTICITIES INPUTS
 *************************************************************************
 
@@ -260,4 +249,4 @@ use "$path\input-labor-sedlac.dta", clear
 append using `macrodata'
 sort Country Year Indicator
 save "$path/$input_sedlac.dta", replace
-
+*/
