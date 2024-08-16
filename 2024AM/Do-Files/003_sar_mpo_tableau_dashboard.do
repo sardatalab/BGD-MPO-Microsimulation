@@ -29,10 +29,15 @@ global qpath "S:/MFM/MFMOD/AM24/data/fcst_check/AM24"
 * Steps to perform 
 *******************
 
-local dostep1 ""	// Download data from MFMod/iSimulate Platform
-local dostep2 ""	// Process MFM all vintages shared with POV
-	local update_povmod "yes"	// If yes, copies MFM-allvintages from server (only in Windows)
-local dostep3 "yes"	// Create aggregates and export CSV data for Tableau
+local dostep1 ""	// Process MFM all vintages shared with POV
+	local update_povmod ""	// If yes, copies MFM-allvintages from server (only in Windows)
+
+
+local dostep2 "yes"	// Read Scenario File from Eviews
+	
+local dostep3 ""	// Download data from MFMod/iSimulate Platform
+local dostep4 ""	// Create aggregates and export CSV data for Tableau
+
 
 *********************
 * Application folder
@@ -42,9 +47,191 @@ global wpath "${qpath}"
 global cpath "${rpath}/${application} MPO Check"
 
 ********************************************************************************
-* Step 1: Download data from MFMod/iSimualte platform
+* Step 1: Dowload MPO data from POV platform
 ********************************************************************************
 if "`dostep1'"=="yes" {
+	
+	if c(os)=="Windows" & "`update_povmod'"=="yes" {
+		cp "//wurepliprdfs01/gpvfile/gpv/Knowledge_Learning/Pov Projection/Central Team/MFM-allvintages.dta" ///	
+			"$data_in/POV_MOD/MFM-allvintages.dta", replace
+	}
+
+	use "$data_in/POV_MOD/MFM-allvintages.dta", clear
+	
+	* Keep only countries of interest
+	keep if inlist(countrycode,"AFG","BGD","BTN","IND","MDV", "NPL","PAK","LKA")
+
+	* Keep last version
+	tab date
+	gen date1=date(date,"MDY")
+	egen datem= max(date1)
+	keep if date1 == datem
+	tab date
+
+	* Keep variables of interes
+	keep year countrycode gdpconstant agriconstant indusconstant servconstant date pop privpc gdppc pop
+	rename countrycode country
+	order country year
+
+	foreach var of varlist pop - servconstant {
+		rename `var' value`var'
+	}
+
+	reshape long value, i(country year) j(indicator) string
+	
+	replace indicator = "pvpop_total"		if indicator=="pop"
+	replace indicator = "pvgdp"				if indicator=="gdpconstant"
+	
+	replace indicator = "pvgdp_services" 	if indicator=="servconstant"
+	replace indicator = "pvgdp_agriculture"	if indicator=="agriconstant"
+	replace indicator = "pvgdp_industry"	if indicator=="indusconstant"
+	
+	replace indicator = "pvgdppc"			if indicator=="gdppc"
+	replace indicator = "pvprivpc"			if indicator=="privpc"	
+	
+	order country year indicator value date
+	sort  country year indicator value
+
+		preserve
+			use "$data_in/UN WPP/popdata_sar_mpo.dta", clear
+			rename value unpop_
+			drop title
+			replace indicator = substr(indicator,7,10)
+			reshape wide unpop_, i(country year date) j(indicator) string
+			gen double shpop_1564 = unpop_1564/unpop_total
+			keep country year shpop_1564
+			tempfile shpop1564
+			save `shpop1564', replace
+		restore
+	merge m:1 country year using `shpop1564'
+	keep if _merge==3
+	drop _merge
+	
+	expand 2 if indicator=="pvpop_total"
+	bys country year indicator: replace indicator = "pvpop_1564" if indicator=="pvpop_total" & _n==2
+	replace value = value * shpop_1564 if indicator=="pvpop_1564"
+	drop shpop_1564
+	replace value = value*10^6 if substr(indicator,1,5)=="pvpop"
+	format value %15.3f
+	
+	gen title = .
+		replace title = 200 if indicator=="pvpop_total"
+		replace title = 202 if indicator=="pvpop_1564"
+		
+		replace title = 210 if indicator=="pvgdp"
+		replace title = 211 if indicator=="pvgdp_agriculture"
+		replace title = 212 if indicator=="pvgdp_industry"
+		replace title = 213 if indicator=="pvgdp_services"
+	
+		replace title = 221 if indicator=="pvgdppc"
+		replace title = 222 if indicator=="pvprivpc"
+	
+	#delimit ;
+	label define lbltitle 
+			200 "Population, total"
+			202 "Population, 15-64"
+			210 "GDP, constant"
+			211 "GDP Agriculture, constant"
+			212 "GDP Industry, constant"
+			213 "GDP Services, constant"
+			221 "GDP per capita"
+			222 "Private consumption per capita", add;
+	#delimit cr
+	label values title lbltitle
+	decode title, gen(strtitle)
+	
+	save "$data_in/POV_MOD/macrodata.dta", replace
+	
+	* Load WDI Population Data
+	* Note: On August 6, 2024 wbopendata was down
+	/*
+	wbopendata, update all
+	wbopendata, indicator(SP.POP.TOTL; SP.POP.1564.TO) year(2004:2025) projection clear
+
+	* Keep only LAC countries
+	keep if inlist(countrycode,"AFG","BGD","BTN","IND","MDV", "NPL","PAK","LKA")
+	keep indicatorname  countrycode countryname yr*
+	replace indicatorname = "pop_1564" if indicatorname == "Population ages 15-64, total"
+	replace indicatorname = "pop_total" if indicatorname== "Population, total"
+
+	* Population share for 15-64 y.o.
+	reshape long yr, i(countrycode indicatorname) j(year)
+	reshape wide yr, i(countrycode year) j (indicatorname) string
+	gen double share_pop = yrpop_1564/yrpop_total
+
+	tempfile popwdi
+	save `popwdi', replace
+	*/
+	* Load UN Population Data
+	
+}
+
+********************************************************************************
+* Step 2: Read Eviews/Stata Output File
+********************************************************************************
+if "`dostep2'"=="yes" {
+	 
+	local keepvars "dateid bgdgdppckn bgdnygdpmktpkn bgdnv*kn"
+	use `keepvars' using "$data_in/Macro and elasticities/bgd - spring meetings 2024 - pov - corrected pop 2.dta", clear
+	
+	gen year = yofd(dateid)
+	drop dateid
+	
+	gen double bgdpop_totl =  (bgdnygdpmktpkn*10^6) / bgdgdppckn
+	label var bgdpop_totl "Population total, derived from MFMod"
+	
+	gen double bgdnvindrestkn = bgdnvindtotlkn - (bgdnvindconskn)
+	gen double bgdnvsrvrestkn = bgdnvsrvtotlkn - (bgdnvsrvtrnskn + bgdnvsrvfinakn)
+	
+	keep year bgdpop_totl bgdnygdpmktpkn bgdgdppckn bgdnvagrtotlkn bgdnvindconskn bgdnvindrestkn bgdnvsrvtrnskn bgdnvsrvfinakn bgdnvsrvrestkn
+	
+	reshape long bgd, i(year) j(indicator) string
+	rename bgd value
+	gen country = "BGD"
+	replace indicator = "mf" + indicator
+	
+	gen title = .
+		replace title = 500 if indicator=="mfnygdpmktpkn"
+		replace title = 501 if indicator=="mfgdppckn"
+		replace title = 502 if indicator=="mfpop_totl"
+		
+		replace title = 510 if indicator=="mfnvagrtotlkn"
+		replace title = 521 if indicator=="mfnvindconskn"
+		replace title = 522 if indicator=="mfnvindrestkn"
+		
+		replace title = 531 if indicator=="mfnvsrvtrnskn"
+		replace title = 532 if indicator=="mfnvsrvfinakn"
+		replace title = 533 if indicator=="mfnvsrvrestkn"
+
+	#delimit ;
+	label define lbltitle 500 "GDP, constant LCU"
+						  501 "GDP per capita, constant LCU"
+						  502 "Total population, implied in BGD-MFMod"
+						  510 "GDP Agriculture, constant LCU"
+						  521 "GDP Construction, constant LCU"
+						  522 "GDP Rest of industry, constant LCU"
+						  531 "GDP Transport, constant LCU"
+						  532 "GDP Finance, constant LCU"
+						  533 "GDP Rest of services, constant LCU";
+	#delimit cr
+	label values title lbltitle
+	decode title, gen(strtitle)
+	
+	gen date = "SM 2024"
+	
+	drop title
+	rename strtitle title
+	keep 	country year indicator value title date
+	order 	country year indicator value title date
+	
+	save "$data_in/Macro and elasticities/mfmod_bgd.dta", replace	
+		
+}
+
+********************************************************************************
+* Step 3: Download data from MFMod/iSimualte platform
+********************************************************************************
+if "`dostep3'"=="yes" {
 
 if c(os)=="Windows" {
 
@@ -177,49 +364,10 @@ if (c(os)=="MacOSX"|c(os)=="Unix") {
 
 }
 
-
 ********************************************************************************
-* Step 2: Dowload MPO data from POV platform
+* Step 4: Process MFM data for Tableau
 ********************************************************************************
-if "`dostep2'"=="yes" {
-	
-	if c(os)=="Windows" & "`update_povmod'"=="yes" {
-		cp "//wurepliprdfs01/gpvfile/gpv/Knowledge_Learning/Pov Projection/Central Team/MFM-allvintages.dta" ///	
-			"$data_in/POV_MOD/MFM-allvintages.dta", replace
-	}
-
-	use "$data_in/POV_MOD/MFM-allvintages.dta", clear
-	
-	* Keep only countries of interest
-	keep if inlist(countrycode,"AFG","BGD","BTN","IND","MDV", "NPL","PAK","LKA")
-
-	* Keep last version
-	tab date
-	gen date1=date(date,"MDY")
-	egen datem= max(date1)
-	keep if date1 == datem
-	tab date
-
-	* Keep variables of interes
-	keep year countrycode gdpconstant agriconstant indusconstant servconstant
-
-	ren *constant Value*
-
-	reshape long Value, i(country year) j(Indicator) string
-	ren (countrycode year) (Country Year)
-
-	order Country Year Indicator Value
-	sort Country Year Indicator Value
-	
-	save "$data_in/POV_MOD/macrodata.dta", replace
-	
-}
-
-
-********************************************************************************
-* Step 3: Process MFM data for Tableau
-********************************************************************************
-if "`dostep3'"=="yes" {
+if "`dostep4'"=="yes" {
 	
 	* Import World Bank country names from World Bank data
 	
@@ -296,19 +444,6 @@ if "`dostep3'"=="yes" {
 	
 	egen countryid = group(country)
 	
-	/*
-	gen ecakeep = . 
-	foreach cty in ALB ARM AZE BLR BIH BGR HRV GEO KAZ KSV KGZ LVA MKD MDA MNE	///
-	               POL ROM RUS SRB TJK TUR TKM UKR UZB ///
-				   /*CAT WEU EUW EUS EHC NTE WBK CAE SCC CAC EUO*/ {
-		di "`cty'"
-		replace ecakeep = 1 if country=="`cty'"
-		di ""
-	}
-	
-	keep if ecakeep == 1
-	drop ecakeep
-	*/
 	gen saskeep = . 
 	foreach cty in AFG BGD BTN IND LKA MDV NPL PAK {
 		di "`cty'"
@@ -327,27 +462,7 @@ if "`dostep3'"=="yes" {
 	keep if mnemonickeep == 1
 	drop mnemonickeep 
 	
-	* Colors
-	gen color = . 
-	/*
-	gen region = 0
-	foreach cty in EUW EUS EHC NTE SSC CAC CAE WEU CAT {
-		replace region = 1 if country=="`cty'"
-	}
 
-	levelsof country if region==0, local(ctystocolor)
-
-	local c = 1
-	foreach cty of local ctystocolor {
-		replace color = `c' if country=="`cty'" 
-		local c = `c' + 1
-		if `c' == 8 local c = 1
-	}
-	
-	replace color = 8 if region==1
-	drop region
-	drop if year<2005
-	*/
 	drop category 
 	keep if saskeep==1
 	drop saskeep
@@ -357,6 +472,10 @@ if "`dostep3'"=="yes" {
 	replace subtitle = subinstr(subtitle,"(","",2)
 	replace subtitle = subinstr(subtitle,")","",2)
 		
+	replace indicatorid = indicatorid + 200
+	
+	gen date = "`c(current_date)'"
+	
 	save           "$cpath/MPO Check data.dta", replace
 
 	* Splitting the databases for faster load	

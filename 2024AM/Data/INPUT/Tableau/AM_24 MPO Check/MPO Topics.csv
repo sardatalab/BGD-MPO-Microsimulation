@@ -1,7 +1,7 @@
 indicatorid,topicid,topicname,sectorid,sectorname
-1,2,"Sectoral",10,"Agriculture"
-15,2,"Sectoral",20,"Industry"
-20,2,"Sectoral",10,"Agriculture"
-24,2,"Sectoral",20,"Industry"
-25,2,"Sectoral",30,"Services"
-27,2,"Sectoral",30,"Services"
+201,2,"Sectoral",10,"Agriculture"
+215,2,"Sectoral",20,"Industry"
+220,2,"Sectoral",10,"Agriculture"
+224,2,"Sectoral",20,"Industry"
+225,2,"Sectoral",30,"Services"
+227,2,"Sectoral",30,"Services"

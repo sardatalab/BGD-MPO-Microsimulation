@@ -27,8 +27,8 @@ set more off
 	local unwpprevision "WPP2024"
 
 * Running steps
-	local updateunwpp "yes"	// if yes, re-process popdata.data 
-	
+	local updateunwpp  "yes"		// if yes, re-process popdata.data 
+	local processunwpp "yes"
 ********************************************************************************
 * Update data from UN WPP
 ********************************************************************************
@@ -185,7 +185,7 @@ if "`updateunwpp'"=="" {
 ********************************************************************************
 * Collects Population Data
 ********************************************************************************
-
+if "`processunwpp'"=="yes" {
 	use country cohort pop* using "$data_in/UN WPP/popdata.dta", clear
 	
 	gen cohortnum = .
@@ -212,52 +212,86 @@ if "`updateunwpp'"=="" {
 	
 	label values cohortnum lblcohortnum
 	
-	gen popgroup = 3
-	replace popgroup = 1 if cohortnum>=1 & cohortnum<=3
-	replace popgroup = 2 if cohortnum>=4 & cohortnum<=13
+	gen popgroup = 103
+	replace popgroup = 101 if cohortnum>=1 & cohortnum<=3
+	replace popgroup = 102 if cohortnum>=4 & cohortnum<=13
 	
-	label define lblpopgroup 1 "UN Population 0-14" 2 "UN Population 15-64" 3 "UN Population 65+", add
-	label values popgroup lblpopgroup
+	rename popgroup title
 	
-	collapse (sum) pop1950 - pop2100, by(country popgroup)
+	collapse (sum) pop1950 - pop2100, by(country title)
 	
-	keep if inlist(country,"BGD","LKA","MDV")
+	keep if inlist(country,"AFG","BGD","BTN","IND","MDV", "NPL","PAK","LKA")
 	
 	gen var = ""
-	replace var = "unpop_0014" if popgroup==1
-	replace var = "unpop_1564" if popgroup==2
-	replace var = "unpop_65up" if popgroup==3
+	replace var = "unpop_0014" if title==101
+	replace var = "unpop_1564" if title==102
+	replace var = "unpop_65up" if title==103
 	
 	order country var
 	
 	preserve
 		collapse (sum) pop1950 - pop2100, by(country)
 		gen var = "unpop_total"
-		gen popgroup = 4
-		order country var popgroup
+		gen title = 104
+		order country var title
 		tempfile poptotal
 		save `poptotal'
 	restore
 	
 	append using `poptotal'
-	label define lblpopgroup 4 "UN Population, total", add 
-	rename popgroup pg
-	reshape long pop, i(country var pg) j(year)
-	keep if year>=2010 & year<=2030
+	label define lbltitle 104 "UN Population, total", add 
+	reshape long pop, i(country var title) j(year)
+	keep if year>=2000 & year<=2030
 	format pop %20.0f 
 	
 	* Final formatting
 	
-	rename pop Value
-	rename pg  Indicator
-	rename var variable
-	order country year variable Indicator Value	
-	sort  country year variable 
-	save "$data_in/UN WPP/popdata_sar_mpo.dta", replace
+	rename pop 		value
+	rename var	 	indicator
+	rename country 	country
+	rename year 	year
 	
+	gen date = "UN-WPP Rev. 2024"
+	
+	order country year indicator value date title
+	sort  country year indicator
+	
+	tempfile unpopdata
+	save `unpopdata', replace
+	
+	* Import WDI data
+	* wbopendata, indicator(SP.POP.TOTL; SP.POP.1564.TO) long clear
+	* save "$data_in/UN WPP/wdi_popdata.dta", replace
+	use "$data_in/UN WPP/wdi_popdata.dta", clear
+	
+	rename countrycode country
+	keep if inlist(country,"AFG","BGD","BTN","IND","MDV", "NPL","PAK","LKA")
+	keep country year sp_*
+	rename sp_* valuewbsp_*
+	reshape long value, i(country year) j(indicator) string
 
+	gen date = "`c(current_date)'"
 	
-	export excel using "$data_in/Macro and elasticities/Working Input Elasticities.xlsx", sheet("input-unpop", replace) firstrow(variables)
+	gen title = .
+	replace title = 114 if indicator=="wbsp_pop_totl"
+	replace title = 112 if indicator=="wbsp_pop_1564_to"
+	
+	label values title lbltitle
+		
+	order country year indicator value title date
+	sort  country year indicator
+	
+	append using `unpopdata'
+	
+	label define lbltitle 101 "Population, 0-14 (UN)" 	102 "Population, 15-64 (UN)" 103 "Population, 65+ (UN)" 104 "Population, total (UN)", add
+	label define lbltitle                          		112 "Population, 15-64 (WDI)"                     		114 "Population, total (WDI)" , add
+	label values title lbltitle	
+	
+	save "$data_in/UN WPP/popdata_sar_mpo.dta", replace
+}
+
+
+	*export excel using "$data_in/Macro and elasticities/Working Input Elasticities.xlsx", sheet("input-unpop", replace) firstrow(variables)
 	
 	
 ********************************************************************************

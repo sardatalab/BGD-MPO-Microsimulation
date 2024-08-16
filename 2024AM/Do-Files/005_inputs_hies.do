@@ -19,29 +19,35 @@ drop _all
 * Set up postfile for results
 tempname mypost
 tempfile myresults
-postfile `mypost' str12(country) year str40(variable) str40(Indicator) Value using `myresults', replace
+postfile `mypost' str12(country) year str40(indicator) value str40(title) using `myresults', replace
 
 
 *************************************************************************
 * 	1 - HIES DATA
 *************************************************************************
 
-foreach country of global countries_hies { // Open loop countries
+foreach country in BGD { // Open loop countries
 	
-	foreach year of numlist ${init_year_hies} / ${end_year_hies} { // Open loop year
+	foreach year of numlist 2016 2022 { // Open loop year
 		
 		* Loading the data
 		di in red "`country' - `year'"
-		
-		else if "`country'" == "BGD" & `year' < 2016 continue // We start from 2016
 				
-		else cap datalibweb, country("`country'") year(`year') mod(INC) clear 
-		
-		if !_rc di in red "`country' `year' loaded in datalib"
-		if _rc {
-			di in red "`country' `year' NOT loaded in datalib"
-			use "$data_root/BGD_2022_HIES_v02_M_v02_A_SARMD_SIM.dta", clear
+		if "`country'" == "BGD" & `year' == 2016 {
+			use "$data_root/DLW/HIES/BGD_2016_HIES_v01_M_v07_A_SARMD_IND.dta", clear
+			merge 1:1 idh idp using "$data_root/DLW/HIES/BGD_2016_HIES_v01_M_v07_A_SARMD_INC.dta"
+			drop _merge
+			merge 1:1 pid using "$data_root/DLW/HIES/BGD_2016_HIES_v01_M_v07_A_SARMD_LBR.dta"
+			drop _merge
 		}
+		if "`country'" == "BGD" & `year' == 2022 {
+			use "$data_root/DLW/HIES/BGD_2022_HIES_v02_M_v02_A_SARMD_IND.dta", clear
+			merge 1:1 idh idp using "$data_root/DLW/HIES/BGD_2022_HIES_v02_M_v02_A_SARMD_INC.dta"
+			drop _merge
+			merge 1:1 pid using "$data_root/DLW/HIES/BGD_2022_HIES_v02_M_v02_A_SARMD_LBR.dta"
+			drop _merge
+		}
+
 	
 		* Filter for coherent households.
 		*****************************************************
@@ -68,14 +74,15 @@ foreach country of global countries_hies { // Open loop countries
 		qui cap drop d_s
 		qui gen d_s = .
 			replace d_s = 1 if occup_year>=1 & occup_year<=3 & lstatus_year==1 & sample==1
-			replace d_s = 0 if occup_year>=4 & occup_year!=. & lstatus_year==1 & sample==1
+			replace d_s = 1 if occup_year==6          		 & lstatus_year==1 & sample==1
+			replace d_s = 0 if ((occup_year==4|occup_year==5)|(occup_year>=7 & occup_year!=.)) & lstatus_year==1 & sample==1
 			replace d_s = 0 if occup_year==. & educy<=9             & lstatus_year==1 & sample==1
 			replace d_s = 1 if occup_year==. & educy>=10 & educy!=. & lstatus_year==1 & sample==1
 			replace d_s = 0 if occup_year==. & educy==. 			& lstatus_year==1 & sample==1
 		label define lbld_s 0 "Unskilled" 1 "Skilled"
 		label values d_s lbld_s
 
-		* lstatus
+		* Use lstatus to fix inconsistent lstatus_year
 		replace lstatus_year = 2 if lstatus==2 & lstatus_year==. & sample==1
 		replace lstatus_year = 3 if lstatus==3 & lstatus_year==. & sample==1
 		replace lstatus_year = 3 if lstatus_year==. 		     & sample==1
@@ -104,23 +111,22 @@ foreach country of global countries_hies { // Open loop countries
 		
 		* Labor income - s0/s1 by sector and total
 		*******************************************************
-		gen double welfare_ppp17 = ((12/365)*welfarenat/cpi2017/icp2017)
-		gen double ip_ppp17 = ((12/365)* ip/cpi2017/icp2017) if cohi == 1 // Labor income main activity ppp 2017
-		
+		*gen double ip_ppp17 = ((12/365)* ip/cpi2017/icp2017) if cohi == 1 // Labor income main activity ppp 2017, daily
+		gen double ip_lcu   =  (12/365)*ip					 if cohi == 1 // Labor income main activity in LCU, daily
 		
 		levelsof d_s, local(alls)
 		levelsof industry_imp, local(alla)
 		foreach s of local alls {
 		foreach a of local alla {
 		
-			qui gen ip_s`s'_a`a' = ip_ppp17 if sample == 1 & lstatus_year==1 & industry_imp == `a' & d_s == `s' 
+			qui gen ip_s`s'_a`a' = ip_lcu if sample == 1 & lstatus_year==1 & industry_imp == `a' & d_s == `s' 
 			
 		}
 		}
 		
-		qui gen ip_total  = ip_ppp17 if sample == 1 & lstatus_year==1
-		qui gen ip_s1     = ip_ppp17 if sample == 1 & lstatus_year==1 & d_s == 1 
-		qui gen ip_s0 	  = ip_ppp17 if sample == 1 & lstatus_year==1 & d_s == 0
+		qui gen ip_total  = ip_lcu if sample == 1 & lstatus_year==1
+		qui gen ip_s1     = ip_lcu if sample == 1 & lstatus_year==1 & d_s == 1 
+		qui gen ip_s0 	  = ip_lcu if sample == 1 & lstatus_year==1 & d_s == 0
 
 		
 		* Number of workers - formal/informal by sector
@@ -140,42 +146,41 @@ foreach country of global countries_hies { // Open loop countries
 		* Total population
 		sum poptotal [w=wgt]
 		local poptotal = `r(sum_w)'
-		post `mypost' ("`country'") (`year') ("hspop_total") ("Population, total") (`poptotal') 
+		post `mypost' ("`country'") (`year') ("hspop_total")  (`poptotal') ("Population, total")
 
 		* Population 00-14
 		sum pop0014 [w=wgt]
 		local pop0014 = `r(sum_w)'*`r(mean)'
-		post `mypost' ("`country'") (`year') ("hspop_0014") ("Population, 00-14") (`pop0014')
+		post `mypost' ("`country'") (`year') ("hspop_0014") (`pop0014') ("Population, 00-14")
 		
 		* Population 15-64
 		sum pop1564 [w=wgt]
 		local pop1564 = `r(sum_w)'*`r(mean)'
-		post `mypost' ("`country'") (`year') ("hspop_1564") ("Population, 15-64") (`pop1564')
+		post `mypost' ("`country'") (`year') ("hspop_1564") (`pop1564') ("Population, 15-64")
 		
 		* Population 65+
 		sum pop65up [w=wgt]
 		local pop65up = `r(sum_w)'*`r(mean)'
-		post `mypost' ("`country'") (`year') ("hspop_65up") ("Population, 65+") (`pop65up')
+		post `mypost' ("`country'") (`year') ("hspop_65up") (`pop65up') ("Population, 65+")
 		
 		* Not in the labor force
 		sum lstatus_year [w=wgt] if lstatus_year == 3 & sample == 1
 		local lstatus3 = `r(sum_w)'
-		post `mypost' ("`country'") (`year') ("lstatus3_1564") ("Not in Labor Force") (`lstatus3')
+		post `mypost' ("`country'") (`year') ("hslstatus3_1564") (`lstatus3') ("Not in Labor Force") 
 
 		* Unemployed
 		sum lstatus_year [w=wgt] if lstatus_year == 2 & sample == 1 
 		local lstatus2 = `r(sum_w)'
-		post `mypost' ("`country'") (`year') ("lstatus2_1564") ("Unemployed") (`lstatus2')
-
+		post `mypost' ("`country'") (`year') ("hslstatus2_1564") (`lstatus2') ("Unemployed") 
 		* Employment
 		sum lstatus_year [w=wgt] if lstatus_year == 1 & sample == 1  
 		local lstatus1 = `r(sum_w)'
-		post `mypost' ("`country'") (`year') ("lstatus1_1564") ("Employed") (`lstatus1')
-
+		post `mypost' ("`country'") (`year') ("hslstatus1_1564") (`lstatus1') ("Employed") 
+		
 		* Labor Force
 		sum wgt if (lstatus_year == 1|lstatus_year==2) & sample == 1
 		local lstatus12 = `r(sum)'
-		post `mypost' ("`country'") (`year') ("lstatus12_1564") ("Labor Foce") (`lstatus12')
+		post `mypost' ("`country'") (`year') ("hslstatus12_1564") (`lstatus12') ("Labor Foce") 
 
 		* Number of workers, across industries and type of workers
 		foreach s of local alls {
@@ -186,7 +191,7 @@ foreach country of global countries_hies { // Open loop countries
 			local laba : label lblindustry_imp `a'
 			local labs : label lbld_s `s'
 			
-			post `mypost' ("`country'") (`year') ("lstatus1_s`s'_a`a'") ("Workers `laba' `labs'") (`lstatus1_s`s'_a`a'')
+			post `mypost' ("`country'") (`year') ("hslstatus1_s`s'_a`a'") (`lstatus1_s`s'_a`a'') ("Workers `laba' `labs'") 
 		}
 		}
 		
@@ -194,7 +199,7 @@ foreach country of global countries_hies { // Open loop countries
 		************************
 		qui sum ip_total [w=wgt]
 		local ip_total = `r(mean)'
-		post `mypost' ("`country'") (`year') ("ip_total") ("IP All") (`ip_total')
+		post `mypost' ("`country'") (`year') ("hsip_total") (`ip_total') ("IP All")
 
 		foreach s of local alls {
 		foreach a of local alla {
@@ -204,7 +209,7 @@ foreach country of global countries_hies { // Open loop countries
 			local laba : label lblindustry_imp `a'
 			local labs : label lbld_s `s'			
 			
-			post `mypost' ("`country'") (`year') ("ip_s`s'_a`a'") ("Mean income in `laba' `labs'") (`ip_s`s'_a`a'')
+			post `mypost' ("`country'") (`year') ("hsip_s`s'_a`a'") (`ip_s`s'_a`a'') ("Mean income in `laba' `labs'") 
 		}
 		}
 
@@ -218,14 +223,17 @@ foreach country of global countries_hies { // Open loop countries
 	postclose `mypost'
 	use  `myresults', clear
 	
+	
+	
 	compress
 	save "$data_in/Tableau/AM_24 MPO Check/input-labor-hies.dta", replace
-	save "$data_in/Tableau/AM_24 MPO Check/version_control/input-labor-hies `c(current_date)' `c(current_time)'.dta", replace
+	save "$data_in/Tableau/AM_24 MPO Check/version_control/input-labor-hies `c(current_date)'.dta", replace
 	
-	export excel using "$data_in/Macro and elasticities/Working Input Elasticities.xlsx", sheet("input-labor-hies", replace) firstrow(variables)
-	export excel using "$data_in/Macro and elasticities/Working Input Elasticities.xlsx", sheet("input-labor-hies", replace) firstrow(variables)
+	
+	*export excel using "$data_in/Macro and elasticities/Working Input Elasticities.xlsx", sheet("input-labor-hies", replace) firstrow(variables)
+	*export excel using "$data_in/Macro and elasticities/Working Input Elasticities.xlsx", sheet("input-labor-hies", replace) firstrow(variables)
 
-	
+	/*
 	use "$data_in/Tableau/AM_24 MPO Check/input-labor-hies.dta", clear 
 	
 	* mnemonic
@@ -291,15 +299,24 @@ foreach country of global countries_hies { // Open loop countries
 	* topicid
 	indicatorid topicid topicname sectorid sectorname
 	
-	
-	
-sdfdsfds
+*/
 /*************************************************************************
+* 	3 - ELASTICITIES INPUTS
+*************************************************************************/
+
+*************************************************************************
 * 	3 - ELASTICITIES INPUTS
 *************************************************************************
 
-use "$path\input-labor-sedlac.dta", clear
-append using `macrodata'
-sort Country Year Indicator
-save "$path/$input_sedlac.dta", replace
-*/
+use "$data_in/Tableau/AM_24 MPO Check/input-labor-hies.dta", clear
+
+append using "$data_in/Macro and elasticities/mfmod_bgd.dta"
+
+sort country year indicator
+save "$data_in/Macro and elasticities/input_elasticities_hies.dta", replace
+
+
+*use "$path\input-labor-sedlac.dta", clear
+*append using `macrodata'
+*sort country year indicator
+*save "$data_in/Macro and elasticities/input_elasticities_lfs.dta", replace

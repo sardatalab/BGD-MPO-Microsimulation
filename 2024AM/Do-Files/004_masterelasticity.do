@@ -37,7 +37,7 @@ Modification date: 	07/29/2024
 * Set up minimum and maximum years
 *************************************************************
 global countries_hies 	  "BGD"
-global init_year_hies 	= 2022
+global init_year_hies 	= 2016
 global end_year_hies 	= 2022
 
 
@@ -45,19 +45,19 @@ global end_year_hies 	= 2022
 * Set up list of countries with income/expenditure surveys
 * Set up minimum and maximum years
 *************************************************************
-local  countries_lfs   "BGD" 
-global init_year_lfs = 2015
+global countries_lfs   "BGD" 
+global init_year_lfs = 2005
 global end_year_lfs  = 2022
-local quarters "q01 q02 q03 q04"
+global quarters "q01"
 
 
 * Set up Elasticities
 ************************
 * Countries to include and their RESPECTIVE year restriction
 gl countries 	"BGD" 
-gl min_year 	"2010" // Long series
-gl min_year2 	"2016" // Middle series
-gl min_year3 	"2016" // Short Series
+gl min_year 	"2005" // Long series
+gl min_year2 	"2010" // Middle series
+gl min_year3 	"2015" // Short Series
 gl last_year 	"2022" // Last year
 
 
@@ -67,13 +67,13 @@ gl last_year 	"2022" // Last year
 *************************************************************************
 
 * 1. inputs using HIES				  
-	do "$dofiles/004_inputs_hies.do"
+	do "$dofiles/005_inputs_hies.do"
 
 * 2. inputs using LFS
-	*do "$dofiles/005_inputs_lfs.do"
+	do "$dofiles/006_inputs_lfs.do"
 		
 * 4. elasticities
-	*do "$dofiles/006_elasticities.do"
+	*do "$dofiles/007_elasticities.do"
 	
 	
 *************************************************************************

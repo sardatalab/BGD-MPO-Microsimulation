@@ -19,7 +19,7 @@ drop _all
 * Set up postfile for results
 tempname regressions
 tempfile aux
-postfile `regressions' str3(Country) str10(Period) str11(Year) str20(Model) str80(Elasticity) Value using `aux', replace
+postfile `regressions' str3(country) str10(Period) str11(year) str20(model) str80(elasticity) value using `aux', replace
 
 local n : word count $countries
 
@@ -27,29 +27,130 @@ local n : word count $countries
 * 	1 - DATA FILE AND VARIABLES
 *************************************************************************
 
-use $input_sedlac, clear
-gen source = "SEDLAC"
-append using $input_lablac
-replace source = "LABLAC" if source == ""
-duplicates tag Country Year Indicator, gen(duplicates)
-drop if duplicates == 1 & source == "LABLAC"
-duplicates report Country Year Indicator
+
+use "$data_in/Macro and elasticities/input_elasticities_hies.dta", clear
+gen source = "HIES"
+append using "$data_in/Macro and elasticities/input_elasticities_lfs.dta"
+replace source = "LFS" if source == ""
+duplicates tag country year indicator, gen(duplicates)
+
+drop if duplicates == 1 & source == "LFS"
+duplicates report country year indicator
 drop duplicates source
 
-replace Indicator = subinstr(Indicator," ","_",.)
-replace Indicator = subinstr(Indicator,".","",.)
-replace Indicator = subinstr(Indicator,"agriculture","agri",.)
-replace Indicator = subinstr(Indicator,"industry","ind",.)
-replace Indicator = subinstr(Indicator,"services","serv",.)
+drop title date
 
-reshape wide Value, i(Country Year) j(Indicator) string
+reshape wide value, i(country year) j(indicator) string
 
-ren Value* *
+ren value* *
 ren *, lower
-drop if active == . | gdp == . | country == "NIC"
-drop avg_formal_income avg_income avg_informal_income inactive_population total_population unemployed_population working_population
+
+rename mfnvagrtotlkn	mfnv_a1
+rename mfnvindconskn	mfnv_a2
+rename mfnvindrestkn	mfnv_a3
+rename mfnvsrvtrnskn	mfnv_a4
+rename mfnvsrvfinakn	mfnv_a5
+rename mfnvsrvrestkn	mfnv_a6
+
+* Interpolation
+	foreach sr in hs lf {
+	forvalues a = 1/6 {
+	foreach s in 0 1 {
+	foreach vv in ip lstatus1 {
+		ipolate `sr'`vv'_s`s'_a`a' mfnv_a`a', gen(__`sr'`vv'_s`s'_a`a')
+			replace `sr'`vv'_s`s'_a`a' = __`sr'`vv'_s`s'_a`a' if `sr'`vv'_s`s'_a`a'==. & __`sr'`vv'_s`s'_a`a'!=.
+			drop __`sr'`vv'_s`s'_a`a'
+	}
+	}
+	}
+	}
+	
+	foreach sr in hs lf {
+		ipolate `sr'lstatus12_1564 mfnygdpmktpkn, gen(__`sr'lstatus12_1564)
+			replace `sr'lstatus12_1564 = __`sr'lstatus12_1564 if `sr'lstatus12_1564==. & __`sr'lstatus12_1564!=.
+			*drop __`sr'lstatus12_1564
+	}
 
 * Total of workers by sector
+	foreach sr in hs lf {
+	forval a = 1/6 {
+		egen double `sr'lstatus1_a`a' = rsum(`sr'lstatus1_s*_a`a')
+		replace `sr'lstatus1_a`a' = . if `sr'lstatus1_a`a'==0
+	}
+	}
+
+* Total of workers by skill level	
+	foreach sr in hs lf {
+	foreach s in 0 1 {
+		egen double `sr'lstatus1_s`s' = rsum(`sr'lstatus1_s`s'_a*)
+		replace  `sr'lstatus1_s`s' = . if  `sr'lstatus1_s`s'==0
+	}
+	}	
+	
+* Total of workers
+	foreach sr in hs lf {
+		egen double `sr'lstatus1 = rsum(`sr'lstatus1_s*_a*)
+		replace `sr'lstatus1 = . if `sr'lstatus1==0
+	}
+	
+* Unskilled rate
+	foreach sr in hs lf {
+		gen double `sr's0 = `sr'lstatus1_s0 / `sr'lstatus1	
+	}
+	
+* Productivities
+	foreach sr in hs lf {
+	forvalues a = 1/6 {
+	foreach s in 0 1 {
+		gen double `sr'prod_s`s'_a`a' = `sr'lstatus1_s`s'_a`a'
+	}
+	}
+	}
+	
+* Creating logs of employment and gdp
+	foreach var of varlist *lstatus1_s*_a* {
+		gen double ln`var' = ln(`var')
+	}
+
+* Growth rates
+	egen id = group(country)
+	xtset id year, yearly
+	foreach v of varlist *lstatus1_s*_a* mf* *lstatus12* {
+		gen gr`v' = (`v'/ l1.`v' - 1) 
+	}
+
+* Annual elasticities employment
+	foreach sr in hs lf {
+	forval a = 1/6 {
+ 	foreach s in 0 1 {
+		gen double `sr'elas_gdp_s`s'_a`a' = gr`sr'lstatus1_s`s'_a`a' / grmfnv_a`a' 
+	}
+	}
+	}
+	
+	foreach sr in hs lf {
+		gen double `sr'elas_gdp_lstatus12 = gr`sr'lstatus12 / grmfnygdpmktpkn
+	}
+	
+* Annual elasticities income
+	
+		gen double `sr'elas_prod_s1_a1 
+	
+	for any agri ind serv : gen elas_prod_for_X = growth_avg_formal_income_X / growth_prod_X
+	for any agri ind serv : gen elas_prod_inf_X = growth_avg_informal_income_X / growth_prod_X
+	
+	
+/*
+replace indicator = subinstr(indicator," ","_",.)
+replace indicator = subinstr(indicator,".","",.)
+replace indicator = subinstr(indicator,"agriculture","agri",.)
+replace indicator = subinstr(indicator,"industry","ind",.)
+replace indicator = subinstr(indicator,"services","serv",.)
+*/
+
+
+* Total of workers by sector
+
 for any agri ind serv: egen workers_X = rowtotal(formal_workers_X informal_workers_X)
 
 * Total of workers by informality
@@ -1091,7 +1192,7 @@ replace Period = "Long" if Period == "_period1"
 replace Period = "Middle" if Period == "_period2"
 replace Period = "Short" if Period == "_period3"
 
-sort Country Period Year Model Elasticity
+sort country Period year model elasticity
 save "Elasticities.dta", replace
 save "inputs_version_control\Elasticities_${version}.dta", replace
 export excel using "$path_mpo\input_MASTER.xlsx", sheet("Elasticities") sheetreplace firstrow(variables)
