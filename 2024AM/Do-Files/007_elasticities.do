@@ -52,23 +52,36 @@ rename mfnvsrvtrnskn	mfnv_a4
 rename mfnvsrvfinakn	mfnv_a5
 rename mfnvsrvrestkn	mfnv_a6
 
-* Interpolation
+* Simple Linear Interpolation
+* This method would allow us to quickly fill the gaps and check the consistency
+* of the code.
 	foreach sr in hs lf {
 	forvalues a = 1/6 {
 	foreach s in 0 1 {
 	foreach vv in ip lstatus1 {
-		ipolate `sr'`vv'_s`s'_a`a' mfnv_a`a', gen(__`sr'`vv'_s`s'_a`a')
-			replace `sr'`vv'_s`s'_a`a' = __`sr'`vv'_s`s'_a`a' if `sr'`vv'_s`s'_a`a'==. & __`sr'`vv'_s`s'_a`a'!=.
+		
+		bys country: egen _minyear  = min(year) if `sr'`vv'_s`s'_a`a'!=.
+		bys country: egen _lastyear = max(year) if `sr'`vv'_s`s'_a`a'!=.
+		
+		bys country: egen minyear  = mean(_minyear)
+		bys country: egen lastyear = mean(_lastyear)
+				
+		bys country: ipolate `sr'`vv'_s`s'_a`a' mfnv_a`a', gen(__`sr'`vv'_s`s'_a`a')
+			replace `sr'`vv'_s`s'_a`a' = __`sr'`vv'_s`s'_a`a' if `sr'`vv'_s`s'_a`a'==. & __`sr'`vv'_s`s'_a`a'!=. & year>=minyear & year<=lastyear
 			drop __`sr'`vv'_s`s'_a`a'
+			
+			drop _minyear _lastyear minyear lastyear
+	
 	}
 	}
 	}
 	}
 	
+
 	foreach sr in hs lf {
-		ipolate `sr'lstatus12_1564 mfnygdpmktpkn, gen(__`sr'lstatus12_1564)
+		bys country: ipolate `sr'lstatus12_1564 mfnygdpmktpkn, gen(__`sr'lstatus12_1564)
 			replace `sr'lstatus12_1564 = __`sr'lstatus12_1564 if `sr'lstatus12_1564==. & __`sr'lstatus12_1564!=.
-			*drop __`sr'lstatus12_1564
+			drop __`sr'lstatus12_1564
 	}
 
 * Total of workers by sector
@@ -108,14 +121,14 @@ rename mfnvsrvrestkn	mfnv_a6
 	}
 	
 * Creating logs of employment and gdp
-	foreach var of varlist *lstatus1_s*_a* {
+	foreach var of varlist *lstatus1_s*_a* *lstatus12* *mf* {
 		gen double ln`var' = ln(`var')
 	}
 
 * Growth rates
 	egen id = group(country)
 	xtset id year, yearly
-	foreach v of varlist *lstatus1_s*_a* mf* *lstatus12* {
+	foreach v of varlist *lstatus1_s*_a* mf* *lstatus12* *ip_* *prod_* {
 		gen gr`v' = (`v'/ l1.`v' - 1) 
 	}
 
@@ -133,58 +146,16 @@ rename mfnvsrvrestkn	mfnv_a6
 	}
 	
 * Annual elasticities income
+	foreach sr in hs lf {
+	forval a = 1/6 {
+ 	foreach s in 0 1 {	
+		gen double `sr'elas_prod_s`s'_a`a' = gr`sr'ip_s`s'_a`a' / gr`sr'prod_s`s'_a`a'
+	}
+	}
+	}
 	
-		gen double `sr'elas_prod_s1_a1 
-	
-	for any agri ind serv : gen elas_prod_for_X = growth_avg_formal_income_X / growth_prod_X
-	for any agri ind serv : gen elas_prod_inf_X = growth_avg_informal_income_X / growth_prod_X
-	
-	
-/*
-replace indicator = subinstr(indicator," ","_",.)
-replace indicator = subinstr(indicator,".","",.)
-replace indicator = subinstr(indicator,"agriculture","agri",.)
-replace indicator = subinstr(indicator,"industry","ind",.)
-replace indicator = subinstr(indicator,"services","serv",.)
-*/
 
-
-* Total of workers by sector
-
-for any agri ind serv: egen workers_X = rowtotal(formal_workers_X informal_workers_X)
-
-* Total of workers by informality
-for any formal informal : egen workers_X = rowtotal(X_workers_agri X_workers_ind X_workers_serv)
-
-* Total of workers
-egen workers = rowtotal(workers_formal workers_informal)
-
-* Informality rate
-gen informality = workers_informal / workers
-
-* Productivities
-for any agri ind serv : gen prod_X = X / workers_X 
-
-* Creating logs of employment and gdp
-foreach v of varlist active_population-workers_serv prod_agri-prod_serv {
-	gen log_`v' = log(`v')
-}
-
-* Growth rates
-foreach v of varlist active_population-workers_serv prod_agri-prod_serv {
-	gen growth_`v' = (`v'/ `v'[_n-1] - 1) if country[_n] == country[_n-1]
-}
-
-* Annual elasticities employment
-for any agri ind serv : gen elas_gdp_for_X = growth_formal_workers_X / growth_X
-for any agri ind serv : gen elas_gdp_inf_X = growth_informal_workers_X / growth_X
-gen elas_gdp_emp = growth_active_population / growth_gdp
-
-* Annual elasticities income
-for any agri ind serv : gen elas_prod_for_X = growth_avg_formal_income_X / growth_prod_X
-for any agri ind serv : gen elas_prod_inf_X = growth_avg_informal_income_X / growth_prod_X
-
-* Iteration variables log_gdp * informality rate
+/* Iteration variables log_gdp * informality rate
 gen iteration = log_gdp * informality
 
 * Missing variables
@@ -201,26 +172,39 @@ foreach s of local sectors {
 	qui gen elas_prod_for_`s'_1_99_imp = .
 	qui gen elas_prod_inf_`s'_1_99_imp = .
 }
+*/
 
 *************************************************************************
 * 	2 - ELASTICITIES
 *************************************************************************
 
-forvalues i = 1/`n' {
-	local country 	: word `i' of $countries
-    local min 		: word `i' of $min_year
-	local last 		: word `i' of $last_year
-	local min2		: word `i' of $min_year2
-	local min3		: word `i' of $min_year3
-	
-	
+	tempfile preelasticities
+	save `preelasticities', replace
+
+	local allcountries "BGD"
 	di in red "`country'"
+	
+	local min1 = 2005
+	local min2 = 2010
+	local min3 = 2015
+	local last = 2025
+	
+forvalues p = 1/3 {
+foreach country of local allcountries {
+
+	noi di `" use if year>=`min`p'' & year<=`last' & country=="`country'" using `preelasticities', clear "'
+
+	*local country 	: word `i' of $countries
+    *local min 		: word `i' of $min_year
+	*local last 	: word `i' of $last_year
+	*local min2		: word `i' of $min_year2
+	*local min3		: word `i' of $min_year3
 	
 	*********************************************************************
 	* 2.1 - Minimum year to last year available
 	*********************************************************************
 	
-	di in red "Period `min' - `last'"
+	*di in red "Period `min' - `last'"
 	
 	*********************************************************************
 	* 2.1.1 - Simple averages
@@ -228,162 +212,122 @@ forvalues i = 1/`n' {
 	
 	* GDP-Activity
 	*****************
-	qui sum elas_gdp_emp if year >= `min' & year <= `last' & country == "`country'"
-	loc av_elas_gdp_emp = r(mean)
-	post `regressions' ("`country'") ("_period1") ("`min' - `last'") ("avg") ("gdp_activity") (`av_elas_gdp_emp')
+	foreach sr in hs lf {
+		sum year if `sr'elas_gdp_lstatus12!=.
+			local min  = r(min)
+			local last = r(max)
+		qui sum `sr'elas_gdp_lstatus12 if year >= `min' & year <= `last' & country == "`country'"
+		loc av_`sr'elas_gdp_lstatus12 = r(mean)
+		post `regressions' ("`country'") ("_period1") ("`min' - `last'") ("avg") ("gdp_activity") (`av_`sr'elas_gdp_lstatus12')
+	}
 	
 	* Sectoral GDP-Sectoral Workers 
 	**********************************
-	local sectors "agri ind serv"
-	foreach sector of local sectors {
-		
-		** Formal
-		qui sum elas_gdp_for_`sector' if year >= `min' & year <= `last' & country == "`country'"
-		loc avg_elas_gdp_for_`sector' = r(mean)
-		post `regressions' ("`country'") ("_period1") ("`min' - `last'") ("avg") ("gdp_for_`sector'") (`avg_elas_gdp_for_`sector'')
-		
-		** Informal
-		qui sum elas_gdp_inf_`sector' if year >= `min' & year <= `last' & country == "`country'"
-		loc avg_elas_gdp_inf_`sector' = r(mean)
-		post `regressions' ("`country'") ("_period1") ("`min' - `last'") ("avg") ("gdp_inf_`sector'") (`avg_elas_gdp_inf_`sector'')
-		
-	}
 	
+	foreach sr in hs lf {
+	forvalues a = 1/6 {
+	foreach s in 0 1 {	
+		
+		sum year if `sr'elas_gdp_s`s'_a`a'!=.
+			local min  = r(min)
+			local last = r(max)
+		qui sum `sr'elas_gdp_s`s'_a`a' if year >= `min' & year <= `last' & country == "`country'"
+		loc avg_`sr'elas_gdp_s`s'_a`a' = r(mean)
+		post `regressions' ("`country'") ("_period1") ("`min' - `last'") ("avg") ("gdp_s`s'_a`a'") (`avg_`sr'elas_gdp_s`s'_a`a'')
+				
+	}	
+	}
+	}
+		
 	* Sectoral Productivity-Sectoral Income 
 	******************************************
-	local sectors "agri ind serv"
-	foreach sector of local sectors {
+	foreach sr in hs lf {
+	forvalues a = 1/6 {
+	foreach s in 0 1 {	
 		
-		** Formal
-		qui sum elas_prod_for_`sector' if year >= `min' & year <= `last' & country == "`country'"
-		loc avg_elas_prod_for_`sector' = r(mean)
-		post `regressions' ("`country'") ("_period1") ("`min' - `last'") ("avg") ("prod_for_`sector'") (`avg_elas_prod_for_`sector'')
-		
-		** Informal
-		qui sum elas_prod_inf_`sector' if year >= `min' & year <= `last' & country == "`country'"
-		loc avg_elas_prod_inf_`sector' = r(mean)
-		post `regressions' ("`country'") ("_period1") ("`min' - `last'") ("avg") ("prod_inf_`sector'") (`avg_elas_prod_inf_`sector'')
-		
+		sum year if `sr'elas_prod_s`s'_a`a'!=.
+			local min = r(min)
+			local last = r(max)
+		sum `sr'elas_prod_s`s'_a`a' if year >= `min' & year <= `last' & country == "`country'"
+		loc avg_`sr'elas_prod_s`s'_a`a' = r(mean)
+		post `regressions' ("`country'") ("_period1") ("`min' - `last'") ("avg") ("prod_s`s'_a`a'") (`avg_`sr'elas_prod_s`s'_a`a'')
+			
+	}	
 	}
-	
+	}
 	
 	*********************************************************************
 	* 2.1.2 - Averages without outliers (1%-99%)
 	*********************************************************************
-	
+	*********************************************************************
+	* 2.1.3 - Averages with imputed outliers (1%-99% using median)
+	*********************************************************************
+
+	foreach var of varlist *elas* {
+		noi di `var'
+		sum year if `var'!=.
+			local min = r(min)
+			local last = r(max)
+		clonevar `var'_1_99 = `var'
+		sum `var', d
+		
+		replace  `var'_1_99 = . 				if (`var'_1_99 <= r(p1) | `var'_1_99 >= r(p99))
+		clonevar `var'_1_99_imp = `var'_1_99
+		
+		replace  `var'_1_99_imp = r(p50) 		if (`var'_1_99 <= r(p1) | `var'_1_99 >= r(p99)) & `var'!=.	
+	}
+
 	* GDP-Activity
 	*****************
-	qui sum elas_gdp_emp if year >= `min' & year <= `last' & country == "`country'", d
-	qui replace elas_gdp_emp_1_99 = elas_gdp_emp if year >= `min' & year <= `last' & country == "`country'" & elas_gdp_emp > r(p1) & elas_gdp_emp < r(p99)
-	qui sum elas_gdp_emp_1_99 if year >= `min' & year <= `last' & country == "`country'"
-	loc av_elas_gdp_emp_1_99 = r(mean)
-	post `regressions' ("`country'") ("_period1") ("`min' - `last'") ("avg_1_99") ("gdp_activity") (`av_elas_gdp_emp_1_99')
+	foreach tt in _1_99 _1_99_imp {
+	foreach sr in hs lf {
+		
+		sum year if `sr'elas_gdp_lstatus12!=.	// keep without tt marks
+			local min  = r(min)
+			local last = r(max)
+		qui sum `sr'elas_gdp_lstatus12`tt' if year >= `min' & year <= `last' & country == "`country'", d
+			
+		loc av_`sr'elas_gdp_ls12`tt' = r(mean)
+		post `regressions' ("`country'") ("_period1") ("`min' - `last'") ("avg`tt'") ("gdp_activity") (`av_`sr'elas_gdp_ls12`tt'')
+	}
+	}
 	
 	* Sectoral GDP-Sectoral Workers 
 	**********************************
-	local sectors "agri ind serv"
-	foreach sector of local sectors {
+	foreach tt in _1_99 _1_99_imp {
+	foreach sr in hs lf {
+	forvalues a = 1/6 {
+	foreach s in 0 1 {	
 		
-		** Formal
-		qui sum elas_gdp_for_`sector' if year >= `min' & year <= `last' & country == "`country'", d
-		qui replace elas_gdp_for_`sector'_1_99 = elas_gdp_for_`sector' if year >= `min' & year <= `last' & country == "`country'" &elas_gdp_for_`sector' > r(p1) & elas_gdp_for_`sector' < r(p99)
-		qui sum elas_gdp_for_`sector'_1_99 if year >= `min' & year <= `last' & country == "`country'"
-		loc avg_elas_gdp_for_`sector'_1_99 = r(mean)
-		post `regressions' ("`country'") ("_period1") ("`min' - `last'") ("avg_1_99") ("gdp_for_`sector'") (`avg_elas_gdp_for_`sector'_1_99')
-		
-		** Informal
-		qui sum elas_gdp_inf_`sector' if year >= `min' & year <= `last' & country == "`country'", d
-		qui replace elas_gdp_inf_`sector'_1_99 = elas_gdp_inf_`sector' if year >= `min' & year <= `last' & country == "`country'" & elas_gdp_inf_`sector' > r(p1) & elas_gdp_inf_`sector' < r(p99)
-		qui sum elas_gdp_inf_`sector'_1_99 if year >= `min' & year <= `last' & country == "`country'"
-		loc avg_elas_gdp_inf_`sector'_1_99 = r(mean)
-		post `regressions' ("`country'") ("_period1") ("`min' - `last'") ("avg_1_99") ("gdp_inf_`sector'") (`avg_elas_gdp_inf_`sector'_1_99')
-		
+		sum year if `sr'elas_gdp_s`s'_a`a'!=.	// keep withtout tt marks
+			local min  = r(min)
+			local last = r(max)
+		qui sum `sr'elas_gdp_s`s'_a`a'`tt' if year >= `min' & year <= `last' & country == "`country'"
+		loc avg_`sr'elas_gdp_s`s'_a`a'`tt' = r(mean)
+		post `regressions' ("`country'") ("_period1") ("`min' - `last'") ("avg`tt'") ("gdp_s`s'_a`a'") (`avg_`sr'elas_gdp_s`s'_a`a'`tt'')
+				
+	}	
+	}
+	}
 	}
 	
 	* Sectoral Productivity-Sectoral Income 
 	******************************************
-	local sectors "agri ind serv"
-	foreach sector of local sectors {
+	foreach tt in _1_99 _1_99_imp {
+	foreach sr in hs lf {
+	forvalues a = 1/6 {
+	foreach s in 0 1 {	
 		
-		** Formal
-		qui sum elas_prod_for_`sector' if year >= `min' & year <= `last' & country == "`country'", d
-		qui replace elas_prod_for_`sector'_1_99 = elas_prod_for_`sector' if year >= `min' & year <= `last' & country == "`country'" & elas_prod_for_`sector' > r(p1) & elas_prod_for_`sector' < r(p99)
-		qui sum elas_prod_for_`sector'_1_99 if year >= `min' & year <= `last' & country == "`country'"
-		loc avg_elas_prod_for_`sector'_1_99 = r(mean)
-		post `regressions' ("`country'") ("_period1") ("`min' - `last'") ("avg_1_99") ("prod_for_`sector'") (`avg_elas_prod_for_`sector'_1_99')
-		
-		** Informal
-		qui sum elas_prod_inf_`sector' if year >= `min' & year <= `last' & country == "`country'", d
-		qui replace elas_prod_inf_`sector'_1_99 = elas_prod_inf_`sector' if year >= `min' & year <= `last' & country == "`country'" & elas_prod_inf_`sector' > r(p1) & elas_prod_inf_`sector' < r(p99)
-		qui sum elas_prod_inf_`sector'_1_99 if year >= `min' & year <= `last' & country == "`country'"
-		loc avg_elas_prod_inf_`sector'_1_99 = r(mean)
-		post `regressions' ("`country'") ("_period1") ("`min' - `last'") ("avg_1_99") ("prod_inf_`sector'") (`avg_elas_prod_inf_`sector'_1_99')
-		
+		sum year if `sr'elas_prod_s`s'_a`a'!=.	// keep withtout tt marks
+			local min = r(min)
+			local last = r(max)
+		sum `sr'elas_prod_s`s'_a`a'`tt' if year >= `min' & year <= `last' & country == "`country'"
+		loc avg_`sr'elas_prod_s`s'_a`a'`tt' = r(mean)
+		post `regressions' ("`country'") ("_period1") ("`min' - `last'") ("avg`tt'") ("prod_s`s'_a`a'") (`avg_`sr'elas_prod_s`s'_a`a'`tt'')
+			
+	}	
 	}
-	
-	
-	*********************************************************************
-	* 2.1.3 - Averages with imputed outliers (1%-99% using mean)
-	*********************************************************************
-		
-	* GDP-Activity
-	*****************
-	qui sum elas_gdp_emp_1_99 if year >= `min' & year <= `last' & country == "`country'", d
-	loc av_elas_gdp_emp_1_99 = r(p50)
-	qui replace elas_gdp_emp_1_99_imp = elas_gdp_emp_1_99 if year >= `min' & year <= `last' & country == "`country'"
-	qui replace elas_gdp_emp_1_99_imp = `av_elas_gdp_emp_1_99' if elas_gdp_emp_1_99_imp == . & elas_gdp_emp != . & year >= `min' & year <= `last' & country == "`country'"
-	qui sum elas_gdp_emp_1_99_imp if year >= `min' & year <= `last' & country == "`country'"
-	loc av_elas_gdp_emp_1_99_imp = r(mean)
-	post `regressions' ("`country'") ("_period1") ("`min' - `last'") ("avg_1_99_imp") ("gdp_activity") (`av_elas_gdp_emp_1_99_imp')
-	
-	* Sectoral GDP-Sectoral Workers 
-	**********************************
-	local sectors "agri ind serv"
-	foreach sector of local sectors {
-		
-		** Formal
-		qui sum elas_gdp_for_`sector'_1_99 if year >= `min' & year <= `last' & country == "`country'", d
-		loc avg_elas_gdp_for_`sector'_1_99 = r(p50)
-		qui replace elas_gdp_for_`sector'_1_99_imp = elas_gdp_for_`sector'_1_99 if year >= `min' & year <= `last' & country == "`country'"
-		qui replace elas_gdp_for_`sector'_1_99_imp = `avg_elas_gdp_for_`sector'_1_99' if elas_gdp_for_`sector'_1_99_imp == . & elas_gdp_for_`sector' != . & year >= `min' & year <= `last' & country == "`country'"
-		qui sum elas_gdp_for_`sector'_1_99_imp if year >= `min' & year <= `last' & country == "`country'"
-		loc avg_elas_gdp_for_`sector'_1_99_imp = r(mean)
-		post `regressions' ("`country'") ("_period1") ("`min' - `last'") ("avg_1_99_imp") ("gdp_for_`sector'") (`avg_elas_gdp_for_`sector'_1_99_imp')
-		
-		** Informal
-		qui sum elas_gdp_inf_`sector'_1_99 if year >= `min' & year <= `last' & country == "`country'", d
-		loc avg_elas_gdp_inf_`sector'_1_99 = r(p50)
-		qui replace elas_gdp_inf_`sector'_1_99_imp = elas_gdp_inf_`sector'_1_99 if year >= `min' & year <= `last' & country == "`country'"
-		qui replace elas_gdp_inf_`sector'_1_99_imp = `avg_elas_gdp_inf_`sector'_1_99' if elas_gdp_inf_`sector'_1_99_imp == . & elas_gdp_inf_`sector' != . & year >= `min' & year <= `last' & country == "`country'"
-		qui sum elas_gdp_inf_`sector'_1_99_imp if year >= `min' & year <= `last' & country == "`country'"
-		loc avg_elas_gdp_inf_`sector'_1_99_imp = r(mean)
-		post `regressions' ("`country'") ("_period1") ("`min' - `last'") ("avg_1_99_imp") ("gdp_inf_`sector'") (`avg_elas_gdp_inf_`sector'_1_99_imp')
-		
-	}
-	
-	* Sectoral Productivity-Sectoral Income 
-	******************************************
-	local sectors "agri ind serv"
-	foreach sector of local sectors {
-		
-		** Formal
-		qui sum elas_prod_for_`sector'_1_99 if year >= `min' & year <= `last' & country == "`country'", d
-		loc avg_elas_prod_for_`sector'_1_99 = r(p50)
-		qui replace elas_prod_for_`sector'_1_99_imp = elas_prod_for_`sector'_1_99 if year >= `min' & year <= `last' & country == "`country'"
-		qui replace elas_prod_for_`sector'_1_99_imp = `avg_elas_prod_for_`sector'_1_99' if elas_prod_for_`sector'_1_99_imp == . & elas_prod_for_`sector' != . & year >= `min' & year <= `last' & country == "`country'"
-		qui sum elas_prod_for_`sector'_1_99_imp if year >= `min' & year <= `last' & country == "`country'"
-		loc avg_elas_prod_for_`sector'_1_99_imp = r(mean)
-		post `regressions' ("`country'") ("_period1") ("`min' - `last'") ("avg_1_99_imp") ("prod_for_`sector'") (`avg_elas_prod_for_`sector'_1_99')
-		
-		** Informal
-		qui sum elas_prod_inf_`sector'_1_99 if year >= `min' & year <= `last' & country == "`country'", d
-		loc avg_elas_prod_inf_`sector'_1_99 = r(p50)
-		qui replace elas_prod_inf_`sector'_1_99_imp = elas_prod_inf_`sector'_1_99 if year >= `min' & year <= `last' & country == "`country'"
-		qui replace elas_prod_inf_`sector'_1_99_imp = `avg_elas_prod_inf_`sector'_1_99' if elas_prod_inf_`sector'_1_99_imp == . & elas_prod_inf_`sector' != . & year >= `min' & year <= `last' & country == "`country'"
-		qui sum elas_prod_inf_`sector'_1_99_imp if year >= `min' & year <= `last' & country == "`country'"
-		loc avg_elas_prod_inf_`sector'_1_99_imp = r(mean)
-		post `regressions' ("`country'") ("_period1") ("`min' - `last'") ("avg_1_99_imp") ("prod_inf_`sector'") (`avg_elas_prod_inf_`sector'_1_99_imp')
-		
+	}	
 	}
 	
 	
@@ -568,6 +512,8 @@ forvalues i = 1/`n' {
 		post `regressions' ("`country'") ("_period1") ("`min' - `last'") ("reg_iter") ("prod_inf_`sector'") (`reg_prod_inf_`sector'_3')
 		
 	}
+	
+	
 	
 	
 	*********************************************************************
@@ -1184,6 +1130,7 @@ forvalues i = 1/`n' {
 	
 }
 
+}
 postclose `regressions'
 use `aux', clear
 compress
