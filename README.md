@@ -1,2 +1,4 @@
 # BGD-MPO-Microsimulation
-This repository hosts the microsimulation for Bangladesh used for the World Bank Macro Poverty Outlook.
+This repository hosts the macro-microsimulation for Bangladesh.
+It was developed by the South Asia Region Statistics and Data Team
+
