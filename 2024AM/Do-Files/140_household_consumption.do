@@ -25,6 +25,9 @@
 	bys idh: egen agehead = median(_agehead)
 	drop _agehead
 
+* Income to consumption ratio (original)
+	gen double ratio_orig = (ipcf_ppp17/welfare_ppp17)
+	
 * Impute missing values for male - there shouldn't be any missing values in independent vars
 	replace male = 0 if male==.	
 	
@@ -49,7 +52,7 @@
 	label var nwf "New Welfare at household head level (bridge)"
 	
 * Treatment for Case 1: Passthough changes in per capita income to per capita consumption
-	replace nwf = welfare_ppp17 * (pc_inc_s/ipcf_ppp17)  if case==1	
+	*replace nwf = welfare_ppp17 * (pc_inc_s/ipcf_ppp17)  if case==1	
 	
 * Treatment for Case 2: Since initial and final per capita income are zero, household will continue with
 *					   the same per capita consumption
@@ -62,8 +65,18 @@
 
 * Treatement for Case 4. Household will be matched with the most similar household considering a lower per capita consumption
 	gen byte case4_treated = .
-	replace case4_treated = 0 if (ipcf_ppp17==0 | (ipcf_ppp17>0 & ipcf_ppp17!=.)) 				// Not treated: Households with initial with zero income
-	replace case4_treated =	1 if (ipcf_ppp17> 0 & ipcf_ppp17!=.) & (pc_inc_s==0              )	// Trated: Households that turned to income equal to zero
+	replace  case4_treated = 0 if (ipcf_ppp17==0 | (ipcf_ppp17>0 & ipcf_ppp17!=.)) 				// Not treated: Households with initial with zero income
+	replace  case4_treated = 1 if (ipcf_ppp17> 0 & ipcf_ppp17!=.) & (pc_inc_s==0              )	// Trated: Households that turned to income equal to zero
+	
+* Case 1
+	error 1
+	clonevar pc_inc_match = pc_inc_s
+	
+	local vars_match "age hsize pc_inc_match"
+	local vars_group "region ntile urban"
+	
+	frame put ratio_orig `vars_match' `vars_gropu' if case==1 & hhead==1 into(matreceiver)
+	
 	
 * Case 3
 	sort idh idp

@@ -61,8 +61,6 @@
 	tempfile dlwcpi
 	save `dlwcpi', replace	
 	
-	
-	
 	* Year: 2022
 	if `year0'==2022 {
 		
@@ -275,7 +273,6 @@
 		rename industry_imp_2 industry3_2
 		
 	}	
-	
 	
 	
 	* Incorporate IMP module (legacy)

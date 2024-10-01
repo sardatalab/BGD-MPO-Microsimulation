@@ -42,15 +42,15 @@ etime, start
 		local finyear = 2023	// Final year when doing sequential runs
 
 	* Local parallel
-		local parallel 	""	// If "yes", the program will run simulation parallel mode
+		*local parallel 	"yes"	// If "yes", the program will run simulation parallel mode
 
 	* Parallel run set up
-		* If local parallel is set to "yes". Then n batch files will be created
+		* If *local parallel is set to "yes". Then n batch files will be created
 		* with the name batch_`i'.do located in the working directory.
 		* Select initial and final parallel years below	
 			local iniparallelyear = 2022	// First batch file to be created
 			local finparallelyear = 2026	// Last batch file to be created
-			local parallel_automatic "yes"  // If yes, parallel run will start automatically
+			*local parallel_automatic "yes"  // If yes, parallel run will start automatically
 											// Otherwise, call the batch file from terminal or the command prompt
 }		
 *===============================================================================
@@ -108,8 +108,8 @@ etime, start
 	
 		scalar xrxx = 1			// Do not modify
 		scalar xrxy = 1			// Do not modify
-		local _fakeiniyear=xrxx	// Do not modify
-		local _fakefinyear=xrxy	// Do not modify
+		local iniyear=2023	// Do not modify
+		local finyear=2023	// Do not modify
 
 		* Create batch files in MacOSX with sed function
 		if "`parallel'"=="yes" & (c(os)=="MacOSX"|c(os)=="Unix") {
@@ -126,10 +126,10 @@ etime, start
 				* Copy batch file
 				!cp "0 master.do" "batch_`bi'.do"
 				* Replace xrxx and xryy with initial and final years
-				!sed -i '' "s/_fakeiniyear=xrxx/iniyear=`bi'/g" batch_`bi'.do
-				!sed -i '' "s/_fakefinyear=xrxy/finyear=`bi'/g" batch_`bi'.do
+				!sed -i '' "s/iniyear=2023/iniyear=`bi'/g" batch_`bi'.do
+				!sed -i '' "s/finyear=2023/finyear=`bi'/g" batch_`bi'.do
 				* Turn off parallel option
-				!sed -i '' "s/local[[:space:]]parallel/*local parallel/g" batch_`bi'.do
+				!sed -i '' "s/local[[:space:]]parallel/**local parallel/g" batch_`bi'.do
 				
 				* Append line to myscript.sh
 				file write myscript "/usr/local/bin/stata-mp -b do batch_`bi' &" _n
@@ -160,10 +160,10 @@ etime, start
 				* Copy batch file
 				!copy "0 master.do" "batch_`bi'.do"
 				* Replace _fake xrxx and xryy with initial and final years
-				!powershell -command " (Get-Content batch_`bi'.do) -replace '_fakeiniyear=xrxx', 'iniyear=`bi'' | Out-File -encoding ASCII batch_`bi'.do "
-				!powershell -command " (Get-Content batch_`bi'.do) -replace '_fakefinyear=xrxy', 'finyear=`bi'' | Out-File -encoding ASCII batch_`bi'.do "
+				!powershell -command " (Get-Content batch_`bi'.do) -replace 'iniyear=2023', 'iniyear=`bi'' | Out-File -encoding ASCII batch_`bi'.do "
+				!powershell -command " (Get-Content batch_`bi'.do) -replace 'finyear=2023', 'finyear=`bi'' | Out-File -encoding ASCII batch_`bi'.do "
 				* Turn off parallel option
-				!powershell -command " (Get-Content batch_`bi'.do) -replace 'local parallel', '*local parallel' | Out-File -encoding ASCII batch_`bi'.do "
+				!powershell -command " (Get-Content batch_`bi'.do) -replace '*local parallel', '**local parallel' | Out-File -encoding ASCII batch_`bi'.do "
 				
 				* Append line to myscript.sh
 				if `bi'==`iniparallelyear' file write myscript `"   "`c(sysdir_stata)'/StataMP-64" /e /i do batch_`bi'.do "'
@@ -233,7 +233,7 @@ if "`step1_loadhhdata'"=="yes" & "`parallel'"=="" {
 					tot_lai
 					lai_s
 					food_share nfood_share
-					pline_int pline_nat welfarenat welfarenom_ppp17";
+					pline_int pline_nat welfarenom_ppp17";
 
 	#delimit cr
 	keep `minvarset'	
@@ -406,7 +406,7 @@ if "`step3_runsim'"=="yes" {
 		* 130. household income
 			do "$dofiles/130_household_income.do"
 		* 140. household consumption
-			do "$dofiles/140_household_consumption.do"
+			*do "$dofiles/140_household_consumption.do"
 			
 		* Quick summary
 			ineqdec0 pc_inc_s  [w=fexp_s]
