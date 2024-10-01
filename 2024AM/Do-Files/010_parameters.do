@@ -46,8 +46,8 @@ if $national == 1 gl tipo "local"
 if $national == 0 gl tipo "inter"  
 
 * select scenario
-gl model = model[1]
-tostring model, replace
+*gl model = model[1]
+*tostring model, replace
 
 * bonus
 if inlist(bonus,1) gl bonus = 1
@@ -60,83 +60,61 @@ gl m = num_sectors[1]
 if inlist(weights,1) gl weights = 1
 if inlist(weights,0) gl weights = 0
 
-* macro data
-import excel using "$inputs", sheet("input_gdp") first clear
-
-* macro data from simulation file
-	use dateid bgdnv* using "$data_in/Macro and elasticities/bgd - spring meetings 2024 - pov - corrected pop 2.dta", clear
-	gen year = yofd(dateid)
-	drop dateid
-	foreach var of varlist bgd* {
-		local nname = substr("`var'",4,60)
-		rename `var' `nname'
-	}
-	
-	gen double nvindrestkn = (nvindtotlkn - nvindconskn)
-	gen double nvsrvrestkn = (nvsrvtotlkn - nvsrvtrnskn - nvsrvfinakn)
-	
-	keep  year nvagrtotlkn nvindconskn nvindrestkn nvsrvtrnskn nvsrvfinakn nvsrvrestkn
-	order year nvagrtotlkn nvindconskn nvindrestkn nvsrvtrnskn nvsrvfinakn nvsrvrestkn
-	
-	egen double nvgdptotlkn = rsum(nvagrtotlkn nvindconskn nvindrestkn nvsrvtrnskn nvsrvfinakn nvsrvrestkn)
-	
-	tsset year, yearly
-	
-	foreach var of varlist nv*kn {
-		sum `var' if year==$base_year
-		local b`var' = r(mean)
-		gen double lav`var' = `var'/`b`var''-1
-	}
-	
-	keep if year == $sim_year
-	keep year lav*
-	reshape long lav, i(year) j(sector) string
+* Read LAV sheet from Excel Input File
+import excel using "$inputs", sheet("linkage_aggregate_variables") first clear    // previously called resumen
+	keep parameters value* lav*
+	drop if parameters==""
+	reshape long value lav, i(parameters) j(year)
+	keep if year==$sim_year
 	rename lav rate
-	rename sector strsector	
-	
-	gen sector = .
-	replace sector = 1 if strsector=="nvagrtotlkn"
-	replace sector = 2 if strsector=="nvindrestkn"
-	replace sector = 3 if strsector=="nvindconskn"
-	replace sector = 4 if strsector=="nvsrvrestkn"
-	replace sector = 5 if strsector=="nvsrvtrnskn"
-	replace sector = 6 if strsector=="nvsrvfinakn"
-									  
-	replace sector = 7 if strsector=="nvgdptotlkn"
-	
-	#delimit ;
-	label define lblsector
-	1 "gdp_agric"
-	2 "gdp_ind"
-	3 "gdp_cons"
-	4 "gdp_serv"
-	5 "gdp_transp"
-	6 "gdp_fin"
-	7 "gdp";
-	#delimit cr
-	label values sector lblsector
-	drop strsector
-	order year sector
-	sort year sector
-	
+	tempfile lavdata
+save `lavdata', replace
+
+* macro data (See sheet "input_gpd")
+use `lavdata', clear
+	keep if substr(parameters,1,3)=="gdp"
+	sort parameters
 mkmat rate, mat(growth_macro_data)
 
-* average labor incomes
-import excel using "$inputs", sheet("input_labor_incomes") first clear    //input_gdp2
+* average labor incomes (See sheet "input_labor_incomes")
+use `lavdata', clear
+	keep if substr(parameters,1,3)=="inc"
+	gen A = substr(parameters,length(parameters)-1,2)
+	replace A = "z0" if A=="A0"	// To place it at the bottom
+	sort A parameters
 mkmat rate, mat(growth_labor_income)
 
-* labor market
-import excel using "$inputs", sheet("input_labor") first clear
+* labor market (See sheet "input_labor")
+use `lavdata', clear
+	keep if substr(parameters,1,2)=="sh"|parameters=="parti_rate"|parameters=="unemp_rate"
+	gen A = "A0"
+	replace A = substr(parameters,length(parameters)-1,2) if substr(parameters,1,2)=="sh"
+	sort A parameters
 mkmat rate, mat(growth_labor)
 
-* non-labor incomes
-import excel using "$inputs", sheet("input_nonlabor") first clear
+* non-labor incomes (See sheet "input_nonlabor")
+use `lavdata', clear
+	gen order = . 
+	replace order = 1 if parameter=="remittances"
+	replace order = 2 if parameter=="pensions"
+	replace order = 3 if parameter=="capital"
+	replace order = 4 if parameter=="bdh"
+	replace order = 5 if parameter=="jgl"
+	keep if order!=.
+	sort order
 mkmat rate, mat(growth_nlabor)
 
-* total population
-import excel using "$inputs", sheet("input_pop_wdi") first clear
+* total population (See sheet "input_pop_wdi")
+use `lavdata', clear
+	keep if parameter=="total population"
 mkmat value, mat(growth_pop_wdi)
+*Alternatively, for using the growth rate:
+*mkmat rate, mat(growth_pop_wdi)
 
+* GDP Per Capita
+use `lavdata', clear
+	keep if parameter=="pccons"
+mkmat rate, mat(pccons)
 
 restore
 

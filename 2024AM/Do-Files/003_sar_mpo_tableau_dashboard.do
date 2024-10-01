@@ -29,11 +29,11 @@ global qpath "S:/MFM/MFMOD/AM24/data/fcst_check/AM24"
 * Steps to perform 
 *******************
 
-local dostep1 ""	// Process MFM all vintages shared with POV
-	local update_povmod ""	// If yes, copies MFM-allvintages from server (only in Windows)
+local dostep1 "yes"	// Process MFM all vintages shared with POV
+	local update_povmod "yes"	// If yes, copies MFM-allvintages from server (only in Windows)
 
 
-local dostep2 "yes"	// Read Scenario File from Eviews
+local dostep2 ""	// Read Scenario File from Eviews
 	
 local dostep3 ""	// Download data from MFMod/iSimulate Platform
 local dostep4 ""	// Create aggregates and export CSV data for Tableau
@@ -94,12 +94,12 @@ if "`dostep1'"=="yes" {
 
 		preserve
 			use "$data_in/UN WPP/popdata_sar_mpo.dta", clear
-			rename value unpop_
-			drop title
-			replace indicator = substr(indicator,7,10)
-			reshape wide unpop_, i(country year date) j(indicator) string
-			gen double shpop_1564 = unpop_1564/unpop_total
-			keep country year shpop_1564
+			drop date title
+			reshape wide value, i(country year) j(indicator) string
+			rename value* *
+			gen double shpop_1564 = wbsp_pop_1564_to/wbsp_pop_totl
+			gen double shpop_15up = wbsp_pop_15up_to/wbsp_pop_totl
+			keep country year shpop_1564 shpop_15up
 			tempfile shpop1564
 			save `shpop1564', replace
 		restore
@@ -108,15 +108,15 @@ if "`dostep1'"=="yes" {
 	drop _merge
 	
 	expand 2 if indicator=="pvpop_total"
-	bys country year indicator: replace indicator = "pvpop_1564" if indicator=="pvpop_total" & _n==2
-	replace value = value * shpop_1564 if indicator=="pvpop_1564"
-	drop shpop_1564
+	bys country year indicator: replace indicator = "pvpop_15up" if indicator=="pvpop_total" & _n==2
+	replace value = value * shpop_15up if indicator=="pvpop_15up"
+	drop shpop_15up
 	replace value = value*10^6 if substr(indicator,1,5)=="pvpop"
 	format value %15.3f
 	
 	gen title = .
 		replace title = 200 if indicator=="pvpop_total"
-		replace title = 202 if indicator=="pvpop_1564"
+		replace title = 202 if indicator=="pvpop_15up"
 		
 		replace title = 210 if indicator=="pvgdp"
 		replace title = 211 if indicator=="pvgdp_agriculture"
@@ -129,7 +129,7 @@ if "`dostep1'"=="yes" {
 	#delimit ;
 	label define lbltitle 
 			200 "Population, total"
-			202 "Population, 15-64"
+			202 "Population, 15+"
 			210 "GDP, constant"
 			211 "GDP Agriculture, constant"
 			212 "GDP Industry, constant"
@@ -171,7 +171,7 @@ if "`dostep1'"=="yes" {
 ********************************************************************************
 if "`dostep2'"=="yes" {
 	 
-	local keepvars "dateid bgdgdppckn bgdnygdpmktpkn bgdnv*kn"
+	local keepvars "dateid bgdgdppckn bgdnygdpmktpkn bgdnv*kn bgdbxfstremtcd"
 	use `keepvars' using "$data_in/Macro and elasticities/bgd - spring meetings 2024 - pov - corrected pop 2.dta", clear
 	
 	gen year = yofd(dateid)
@@ -183,7 +183,7 @@ if "`dostep2'"=="yes" {
 	gen double bgdnvindrestkn = bgdnvindtotlkn - (bgdnvindconskn)
 	gen double bgdnvsrvrestkn = bgdnvsrvtotlkn - (bgdnvsrvtrnskn + bgdnvsrvfinakn)
 	
-	keep year bgdpop_totl bgdnygdpmktpkn bgdgdppckn bgdnvagrtotlkn bgdnvindconskn bgdnvindrestkn bgdnvsrvtrnskn bgdnvsrvfinakn bgdnvsrvrestkn
+	keep year bgdpop_totl bgdnygdpmktpkn bgdgdppckn bgdnvagrtotlkn bgdnvindtotlkn bgdnvindconskn bgdnvindrestkn bgdnvsrvtotlkn bgdnvsrvtrnskn bgdnvsrvfinakn bgdnvsrvrestkn bgdbxfstremtcd
 	
 	reshape long bgd, i(year) j(indicator) string
 	rename bgd value
@@ -196,23 +196,31 @@ if "`dostep2'"=="yes" {
 		replace title = 502 if indicator=="mfpop_totl"
 		
 		replace title = 510 if indicator=="mfnvagrtotlkn"
+		
+		replace title = 520 if indicator=="mfnvindtotlkn"
 		replace title = 521 if indicator=="mfnvindconskn"
 		replace title = 522 if indicator=="mfnvindrestkn"
 		
+		replace title = 531 if indicator=="mfnvsrvtotlkn"
 		replace title = 531 if indicator=="mfnvsrvtrnskn"
 		replace title = 532 if indicator=="mfnvsrvfinakn"
 		replace title = 533 if indicator=="mfnvsrvrestkn"
+		
+		replace title = 540 if indicator=="mfbxfstremtcd"
 
 	#delimit ;
 	label define lbltitle 500 "GDP, constant LCU"
 						  501 "GDP per capita, constant LCU"
 						  502 "Total population, implied in BGD-MFMod"
 						  510 "GDP Agriculture, constant LCU"
+						  520 "GDP Industry, constant LCU"
 						  521 "GDP Construction, constant LCU"
 						  522 "GDP Rest of industry, constant LCU"
+						  531 "GDP Services, constant LCU"
 						  531 "GDP Transport, constant LCU"
 						  532 "GDP Finance, constant LCU"
-						  533 "GDP Rest of services, constant LCU";
+						  533 "GDP Rest of services, constant LCU"
+						  540 "Remittances, millions of US$";
 	#delimit cr
 	label values title lbltitle
 	decode title, gen(strtitle)

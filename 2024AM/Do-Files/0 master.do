@@ -17,6 +17,7 @@
 *===============================================================================
 * TIME
 *===============================================================================
+set processors 2
 capture which etime
 if _rc ssc install etime
 etime, start
@@ -37,8 +38,8 @@ etime, start
 	local  step3_runsim	  "" 	// Run simulations	
 		
 	* Initial and final year for sequential run
-		local iniyear = 2027	// Initial year when doing sequential runs
-		local finyear = 2027	// Final year when doing sequential runs
+		local iniyear = 2023	// Initial year when doing sequential runs
+		local finyear = 2023	// Final year when doing sequential runs
 
 	* Local parallel
 		local parallel 	""	// If "yes", the program will run simulation parallel mode
@@ -48,7 +49,7 @@ etime, start
 		* with the name batch_`i'.do located in the working directory.
 		* Select initial and final parallel years below	
 			local iniparallelyear = 2022	// First batch file to be created
-			local finparallelyear = 2027	// Last batch file to be created
+			local finparallelyear = 2026	// Last batch file to be created
 			local parallel_automatic "yes"  // If yes, parallel run will start automatically
 											// Otherwise, call the batch file from terminal or the command prompt
 }		
@@ -88,16 +89,16 @@ etime, start
 * Globals for country and year identification
 	global country BGD 			// Country to upload
 	global year 2022			// household survey year to use
-	global final_year 2027		// Last simulated year
+	global final_year 2026		// Last simulated year
 	global base_year 2022		// Base year for building LAVs
 
 * Parameters
 	*gl use_saved_parameters "yes" // Not working yet
-	gl re_scale "yes" 			// Change for "yes"/"no" re-scale using total income
-	gl sector_model 6 			// 
+	gl re_scale "" 			// Change for "yes"/"no" re-scale using total income
+	gl sector_model 3		// 
 	gl random_remittances "no" // Change for "yes" or "no" on modelling
 	gl baseyear 2022
-	
+
 }
 *===============================================================================
 * Parallelization - Don't modify
@@ -214,8 +215,9 @@ if "`step2_macromicroinputs'"=="yes" & "`parallel'"=="" {
 		
 	* 004 (master) Elaticity tool based on HIES and LFS
 		* 005, 006, and 007 are called within 004
-		* output E: "$data_in/Tableau/AM_24 MPO Check/input-labor-hies.dta"
-		* output F:
+		* output E: "$data_in/Macro and elasticities/input_elasticities_hies.dta"
+		* output F: "$data_in/Macro and elasticities/input_elasticities_lfs.dta"
+		* output G: "$data_in/Macro and elasticities/Elasticities.dta"
 	do "$dofiles/004_masterelasticity.do"
 	
 		
@@ -233,7 +235,7 @@ if "`step2_macromicroinputs'"=="yes" & "`parallel'"=="" {
 
 	* Output B
 	use "$data_in/POV_MOD/macrodata.dta", clear
-		decode title, gen(strtitle)
+		*decode title, gen(strtitle)
 		drop title
 		rename strtitle title
 		keep 	country year indicator value title date
@@ -242,7 +244,7 @@ if "`step2_macromicroinputs'"=="yes" & "`parallel'"=="" {
 	save `b', replace
 
 	* Output C
-	use "$cpath/MPO Check data.dta", clear
+	use "$data_in/Tableau/AM_24 MPO Check/MPO Check data.dta", clear
 		replace indicator = lower(indicator)
 		replace indicator = "ma" + indicator
 		keep 	country year indicator value title date
@@ -252,6 +254,8 @@ if "`step2_macromicroinputs'"=="yes" & "`parallel'"=="" {
 	
 	* Output D
 	use "$data_in/Macro and elasticities/mfmod_bgd.dta", clear
+	append using "$data_in/Macro and elasticities/mfmod_bgd_base.dta"	// For July 2024 baseline
+	drop ind
 	tempfile d
 	save `d', replace
 		
@@ -260,36 +264,46 @@ if "`step2_macromicroinputs'"=="yes" & "`parallel'"=="" {
 	append using `b'
 	append using `c'
 	append using `d'
-		
+	
+	save               "$path/input-mpo.dta", replace
 	export excel using "$path/input_MASTER.xlsx", sheet("input-mpo", replace) firstrow(variables)
+	
+	* INFLOWS
+	use if indicator=="mfbxfstremtcd" using "$data_in/Macro and elasticities/mfmod_bgd.dta", clear
+	order country year value
+	export excel using "$path/input_MASTER.xlsx", sheet("inflows", replace) firstrow(variables)
 	
 	* OUTPUT E
 	use "$data_in/Tableau/AM_24 MPO Check/input-labor-hies.dta", clear
 		gen date = "`c(current_date)'"
-		keep 	country year indicator value title date
-		order 	country year indicator value title date		
+		keep 	country year indicator value title date nsectors
+		order 	country year indicator value title date	nsectors
 		tempfile e
 		save `e', replace
 	
 	* OUTPUT F
 	use "$data_in/Tableau/AM_24 MPO Check/input-labor-lfs.dta", clear
 		gen date = "`c(current_date)'"		
-		keep 	country year indicator value title date
-		order 	country year indicator value title date
+		keep 	country year indicator value title date nsectors
+		order 	country year indicator value title date nsectors
 		tempfile f
 		save `f', replace
 	
 	use `e', clear
 	append using `f'
 	
+	save               "$path/input-labor", replace
 	export excel using "$path/input_MASTER.xlsx", sheet("input-labor", replace) firstrow(variables)
 	
-	
+	* OUTPUT G
+	use "$data_in/Macro and elasticities/Elasticities.dta", clear
+	save  			   "$path/input-elasticities.dta", replace
+	export excel using "$path/input_MASTER.xlsx", sheet("Elasticities") sheetreplace firstrow(variables)
 }
 *===========================================================================
 * run dofiles
 *===========================================================================
-if "`runsim'"=="yes" {
+if "`step3_runsim'"=="yes" {
 
 	forval yyyy = `iniyear'/`finyear' {
 		clear all
@@ -298,6 +312,9 @@ if "`runsim'"=="yes" {
 
 		* Declarre simulation year
 		global sim_year = `yyyy'
+		
+		if "`yyyy'"=="`iniyear'" global use_saved_parameters "no"
+		else 					 global use_saved_parameters "yes"
 		
 		* Load auxiliary simulation programs
 		local files : dir "$dofiles/auxcode" files "*.do"
@@ -311,8 +328,9 @@ if "`runsim'"=="yes" {
 		if ${year}==2022 use "$data_root/BGD_2022_HIES_v02_M_v02_A_SARMD_SIM.dta", clear
 		
 		* Globals for reading scenarios
-		gl inputs   "$data_in/Macro and elasticities/Inputs elasticities `yyyy'.xlsx" // Country's input Excel file
-
+		*gl inputs   "$path/Microsimulation_Inputs_BGD_A3_BaUAM2024.xlsm" // Country's input Excel file
+		gl inputs   "$path/Microsimulation_Inputs_BGD_A3_CrisisAM2024.xlsm"
+		
 		* 010.input parameters
 			do "$dofiles/010_parameters.do"
 		* 020.prepare variables
@@ -335,18 +353,21 @@ if "`runsim'"=="yes" {
 			if "$re_scale" == "yes" do "$dofiles/100_income_rel_new.do"
 			if "$re_scale" == ""    do "$dofiles/101_income_rel_new_no_rescaling.do"
 		* 110. total labor incomes
-			do "$dofiles/110_total_income.do"	
+			do "$dofiles/110_total_income.do"
 		* 120. total non-labor incomes
 			if "$random_remittances" == "no"  do "$dofiles/120_assign_nlai.do"
 			if "$random_remittances" == "yes" do "$dofiles/121_assign_nlai.do"
 		* 130. household income
 			do "$dofiles/130_household_income.do"
-
+		* 140. household consumption
+			*do "$dofiles/140_household_consumption.do"
+			
 		* Quick summary
 			ineqdec0 pc_inc_s  [w=fexp_s]
+			*ineqdec0 pc_con_s  [w=fexp_s]
 			
 		drop if welfarenom==.
-		save "${data_out}/basesim_${model}", replace
+		save "${data_out}/basesim_`yyyy'", replace
 	}
 }
 *===========================================================================

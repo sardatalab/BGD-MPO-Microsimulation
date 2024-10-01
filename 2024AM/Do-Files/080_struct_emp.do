@@ -21,7 +21,7 @@ note: those with public jobs do not change between sectors
 clonevar public   = public_job
 
 * number of sectors
-clonevar sectorg = sect_main6
+clonevar sectorg = sect_main
 
 sum sectorg
 loc lim = r(max)
@@ -60,6 +60,7 @@ forvalues a = 1/`lim' {
 
 * employment matrix goals 
 loc row_tot = rowsof(growth_labor)
+local lim =6
 mat growth_estru = growth_labor[3..`row_tot',1]
 
 mata: st_mat("growth_estru", "sector", 1,`lim')
@@ -102,7 +103,8 @@ forvalues r = 1/`lim' {
 		dis in red "economic sector `s'"
 		
 		*orders the population according to: activity, probability, hhd id and ind id 
-		loc p = `s' + 1
+		loc p = `s' + 10
+		noi di "Sector `s' Occupation `p'"
 		clonevar P`s' = U`p'_1 
 		replace  P`s' = U`p'_2 if P`s' == .
 		
@@ -139,7 +141,8 @@ forvalues r = 1/`lim'	{
 		loc s = aux[`r',1] 
 		dis in red "economic sector `s'"
 
-		loc p = `s' + 1
+		loc p = `s' + 10
+		noi di "Sector `s' Occupation `p'"
 		clonevar P`s' = U`p'_1 
 		replace  P`s' = U`p'_2 if P`s' == .
 		
@@ -216,7 +219,7 @@ while (`mm' > 0) {
 	sum rank$t
 	loc mm = r(N)
 	di in red "there are `mm' observations left"
-	if `mm' < 16 loc mm = 0	
+	if `mm' < 102 loc mm = 0	
 	note: adjust in case it doesn´t converge, increase the 16. 
 }
 
@@ -243,7 +246,6 @@ drop d_act*
 	replace   sect_main_s = sectorg if sect_main_s== . & sample == . & emplyd_s == 1
 	label var sect_main_s "economic sector simulated"
 	
-	rename sect_main_s sect_main6_s
 	*recode sect_main6_s (1 2 = 1) (3 4 = 2) (5 6 = 3), gen(sect_main_s)
 	*label values sect_main_s sector
 	*ADD labels!
@@ -251,17 +253,17 @@ drop d_act*
 	
 * new occupation status
 	gen     occupation_s = .
-	replace occupation_s = 0 if  active_s     == 0 & sample == 1
-	replace occupation_s = 1 if  unemplyd_s   == 1 & sample == 1
-	replace occupation_s = 2 if  sect_main6_s == 1 & sample == 1
-	replace occupation_s = 3 if  sect_main6_s == 2 & sample == 1
-	replace occupation_s = 4 if  sect_main6_s == 3 & sample == 1
-	replace occupation_s = 5 if  sect_main6_s == 4 & sample == 1
-	replace occupation_s = 6 if  sect_main6_s == 5 & sample == 1
-	replace occupation_s = 7 if  sect_main6_s == 6 & sample == 1
+	replace occupation_s = 0  if  active_s    == 0 & sample == 1
+	replace occupation_s = 10 if  unemplyd_s  == 1 & sample == 1
+	replace occupation_s = 11 if  sect_main_s == 1 & sample == 1
+	replace occupation_s = 12 if  sect_main_s == 2 & sample == 1
+	replace occupation_s = 13 if  sect_main_s == 3 & sample == 1
+	replace occupation_s = 14 if  sect_main_s == 4 & sample == 1
+	replace occupation_s = 15 if  sect_main_s == 5 & sample == 1
+	replace occupation_s = 16 if  sect_main_s == 6 & sample == 1
 
 	label var    occupation_s "occupation status - simulated"
-	label values occupation_s occup
+	label values occupation_s occupation
 
 
 
@@ -281,7 +283,7 @@ forvalues a = 1/`lim' {
 	}
 	
 	if $m != 1 {
-		sum fexp_s if sample == 1 & emplyd_s == 1 & sect_main6_s== `a'
+		sum fexp_s if sample == 1 & emplyd_s == 1 & sect_main_s== `a'
 		mat sector_s[`a',1] = r(sum)
 	}
 }
@@ -297,11 +299,11 @@ mat list sector_s
 replace unemplyd_s   = unemplyd if sample == .
 replace emplyd_s     = emplyd   if sample == .
 replace active_s     = lf_samp  if sample == .
-replace sect_main6_s = sectorg  if sect_main6_s== . & sample == . & emplyd_s == 1
+replace sect_main_s = sectorg  if sect_main_s== . & sample == . & emplyd_s == 1
 
 * check new sectoral structure 
-clonevar sectorg_s = sect_main6_s 
-
+clonevar sectorg_s = sect_main_s 
+local lim = 6
 forvalues a = 1/`lim' {
 	
 	capt drop aux

@@ -1,13 +1,13 @@
 *!v1.1
 /*========================================================================
 Project:			Microsimulations Inputs from LABLAC
-Institution:		World Bank - ELCPV
+Institution:		World Bank
 
 Author:				Kelly Y. Montoya (kmontoyamunoz@worldbank.org)
 Creation Date:		07/24/2023
 
 Last Modification:	Israel Osorio Rodarte (iosoriorodarte@worldbank.org)
-Modification date: 	08/07/2024
+Modification date: 	08/27/2024
 ========================================================================*/
 
 drop _all
@@ -21,7 +21,7 @@ drop _all
 * Set up postfile for results
 tempname mypost
 tempfile myresults
-postfile `mypost' str12(country) year str40(indicator) value str40(title) using `myresults', replace
+postfile `mypost' str12(country) year str40(indicator) value str40(title) nsectors using `myresults', replace
 
 /* Observations
 
@@ -31,6 +31,7 @@ postfile `mypost' str12(country) year str40(indicator) value str40(title) using 
 * 	1 - LFS DATA
 *************************************************************************
 
+foreach ns in 3 6 {
 foreach country in BGD { // Open loop countries
 foreach year of numlist 2005 2010 2013 2015 2016 2022 { // Open loop year
 foreach quarter	in q1 {	// Open loop quarters
@@ -54,10 +55,10 @@ foreach quarter	in q1 {	// Open loop quarters
 	* Defining sample 
 	********************
 	cap drop sample
-	qui gen sample    = (age >= 15 & age <= 64)
+	qui gen sample    = (age >= 15 & age != .)	// Previously 15up
 	gen byte poptotal = 1
 	gen byte pop0014  = (age >= 0  & age <= 14)
-	gen byte pop1564  = (age >= 15 & age <= 64)
+	gen byte pop15up  = (age >= 15 & age != .)	// Previously 15up
 	gen byte pop65up  = (age >= 65 & age != . )
 
 		
@@ -78,6 +79,7 @@ foreach quarter	in q1 {	// Open loop quarters
 	* Industry main occupation
 	* activities a = {1..n}
 	***************************
+	if `ns'==6 {
 	gen industry_imp = .
 		replace industry_imp = 1 if industrycat10==1	// agriculture
 		replace industry_imp = 2 if industrycat10==5	// construction
@@ -100,7 +102,28 @@ foreach quarter	in q1 {	// Open loop quarters
 			6 "Rest of Services";
 		#delimit cr
 		label values industry_imp lblindustry_imp
+	}
+	if `ns'==3 {
+	gen industry_imp = .
+		replace industry_imp = 1 if industrycat10==1	// agriculture
+		replace industry_imp = 2 if industrycat10==5	// construction
+		replace industry_imp = 2 if industrycat10==2|industrycat10==3	// rest of industry			
+		replace industry_imp = 3 if industrycat10==7	// transport
+		replace industry_imp = 3 if industrycat10==8	// financial
+		replace industry_imp = 3 if industrycat10==4|industrycat10==6|industrycat10==9|industrycat10==10
+		replace industry_imp = 3 if industrycat10==. & lstatus==1 // 7 observations
 		
+		* fix inconsistent industry with lstatus
+		replace industry_imp = . if lstatus==2|lstatus==3
+		
+		#delimit ;
+		label define lblindustry_imp
+			1 "Agriculture"
+			2 "Industry"
+			3 "Services";
+		#delimit cr
+		label values industry_imp lblindustry_imp
+	}	
 
 		* Labor income - s0/s1 by sector and total
 		*******************************************************
@@ -144,41 +167,41 @@ foreach quarter	in q1 {	// Open loop quarters
 		* Total population
 		sum poptotal [w=wgt]
 		local poptotal = `r(sum_w)'
-		post `mypost' ("`country'") (`year') ("lfpop_total")  (`poptotal') ("Population, total")
+		post `mypost' ("`country'") (`year') ("lfpop_total")  (`poptotal') ("Population, total") (`ns')
 
 		* Population 00-14
 		sum pop0014 [w=wgt]
 		local pop0014 = `r(sum_w)'*`r(mean)'
-		post `mypost' ("`country'") (`year') ("lfpop_0014") (`pop0014') ("Population, 00-14")
+		post `mypost' ("`country'") (`year') ("lfpop_0014") (`pop0014') ("Population, 00-14") (`ns')
 		
-		* Population 15-64
-		sum pop1564 [w=wgt]
-		local pop1564 = `r(sum_w)'*`r(mean)'
-		post `mypost' ("`country'") (`year') ("lfpop_1564") (`pop1564') ("Population, 15-64")
+		* Population 15up, previously 15-64
+		sum pop15up [w=wgt]
+		local pop15up = `r(sum_w)'*`r(mean)'
+		post `mypost' ("`country'") (`year') ("lfpop_15up") (`pop15up') ("Population, 15+") (`ns')
 		
 		* Population 65+
 		sum pop65up [w=wgt]
 		local pop65up = `r(sum_w)'*`r(mean)'
-		post `mypost' ("`country'") (`year') ("lfpop_65up") (`pop65up') ("Population, 65+")
+		post `mypost' ("`country'") (`year') ("lfpop_65up") (`pop65up') ("Population, 65+") (`ns')
 		
 		* Not in the labor force
 		sum lstatus [w=wgt] if lstatus == 3 & sample == 1
 		local lstatus3 = `r(sum_w)'
-		post `mypost' ("`country'") (`year') ("lflstatus3_1564") (`lstatus3') ("Not in Labor Force") 
+		post `mypost' ("`country'") (`year') ("lflstatus3_15up") (`lstatus3') ("Not in Labor Force") (`ns')
 
 		* Unemployed
 		sum lstatus [w=wgt] if lstatus == 2 & sample == 1 
 		local lstatus2 = `r(sum_w)'
-		post `mypost' ("`country'") (`year') ("lflstatus2_1564") (`lstatus2') ("Unemployed") 
+		post `mypost' ("`country'") (`year') ("lflstatus2_15up") (`lstatus2') ("Unemployed") (`ns')
 		* Employment
 		sum lstatus [w=wgt] if lstatus == 1 & sample == 1  
 		local lstatus1 = `r(sum_w)'
-		post `mypost' ("`country'") (`year') ("lflstatus1_1564") (`lstatus1') ("Employed") 
+		post `mypost' ("`country'") (`year') ("lflstatus1_15up") (`lstatus1') ("Employed") (`ns')
 		
 		* Labor Force
 		sum wgt if (lstatus == 1|lstatus==2) & sample == 1
 		local lstatus12 = `r(sum)'
-		post `mypost' ("`country'") (`year') ("lflstatus12_1564") (`lstatus12') ("Labor Foce") 
+		post `mypost' ("`country'") (`year') ("lflstatus12_15up") (`lstatus12') ("Labor Foce") (`ns')
 
 		* Number of workers, across industries and type of workers
 		foreach s of local alls {
@@ -191,7 +214,7 @@ foreach quarter	in q1 {	// Open loop quarters
 			local laba : label lblindustry_imp `a'
 			local labs : label lbld_s `s'
 			
-			post `mypost' ("`country'") (`year') ("lflstatus1_s`s'_a`a'") (`lstatus1_s`s'_a`a'') ("Workers `laba' `labs'") 
+			post `mypost' ("`country'") (`year') ("lflstatus1_s`s'_a`a'") (`lstatus1_s`s'_a`a'') ("Workers `laba' `labs'") (`ns')
 		}
 		}
 		
@@ -199,7 +222,7 @@ foreach quarter	in q1 {	// Open loop quarters
 		************************
 		sum ip_total [w=wgt]
 		local ip_total = `r(mean)'
-		post `mypost' ("`country'") (`year') ("lfip_total") (`ip_total') ("IP All")
+		post `mypost' ("`country'") (`year') ("lfip_total") (`ip_total') ("IP All") (`ns')
 
 		foreach s of local alls {
 		foreach a of local alla {
@@ -211,7 +234,7 @@ foreach quarter	in q1 {	// Open loop quarters
 			local laba : label lblindustry_imp `a'
 			local labs : label lbld_s `s'			
 			
-			post `mypost' ("`country'") (`year') ("lfip_s`s'_a`a'") (`ip_s`s'_a`a'') ("Mean income in `laba' `labs'") 
+			post `mypost' ("`country'") (`year') ("lfip_s`s'_a`a'") (`ip_s`s'_a`a'') ("Mean income in `laba' `labs'") (`ns')
 		}
 		}
 
@@ -221,7 +244,7 @@ foreach quarter	in q1 {	// Open loop quarters
 } // Close loop quarters
 } // Close loop year	
 } // Close loop countries
-
+} // Close loop for nsectors
 
 postclose `mypost'
 use  `myresults', clear
@@ -238,5 +261,6 @@ use "$data_in/Tableau/AM_24 MPO Check/input-labor-lfs.dta", clear
 
 append using "$data_in/Macro and elasticities/mfmod_bgd.dta"
 
-sort country year indicator
+order country year indicator value title date nsectors
+sort country year indicator value title date nsectors
 save "$data_in/Macro and elasticities/input_elasticities_lfs.dta", replace

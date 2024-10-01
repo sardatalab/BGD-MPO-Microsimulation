@@ -55,10 +55,15 @@ global quarters "q01"
 ************************
 * Countries to include and their RESPECTIVE year restriction
 gl countries 	"BGD" 
-gl min_year 	"2005" // Long series
-gl min_year2 	"2010" // Middle series
-gl min_year3 	"2015" // Short Series
-gl last_year 	"2022" // Last year
+gl lfmin_year1 	"2005" // Long series
+gl lfmin_year2 	"2010" // Middle series
+gl lfmin_year3 	"2015" // Short Series
+gl lflast_year 	"2022" // Last year
+
+*gl hsmin_year1 	"2016" // Long series
+*gl hsmin_year2 	"2016" // Middle series
+gl hsmin_year3 	"2016" // Short Series
+gl hslast_year 	"2022" // Last year
 
 
 
@@ -67,10 +72,10 @@ gl last_year 	"2022" // Last year
 *************************************************************************
 
 * 1. inputs using HIES				  
-	do "$dofiles/005_inputs_hies.do"
+	*do "$dofiles/005_inputs_hies.do"
 
 * 2. inputs using LFS
-	do "$dofiles/006_inputs_lfs.do"
+	*do "$dofiles/006_inputs_lfs.do"
 		
 * 4. elasticities
 	*do "$dofiles/007_elasticities.do"

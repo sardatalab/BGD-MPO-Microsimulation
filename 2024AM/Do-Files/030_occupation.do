@@ -21,7 +21,7 @@ encode subnatid1, gen(region)
 
 
 loc mnl_rhs           c.age##c.age urban ib0.male#ibn.h_head#ib0.married
-loc mnl_rhs `mnl_rhs' remitt_any depen oth_pub ib0.male#ibn.educ_lev atschool
+loc mnl_rhs `mnl_rhs' remitt_any depen oth_pub /*ib0.male#ibn.educ_lev*/ atschool
 loc mnl_rhs `mnl_rhs' ib1.region
 
 * skill levels
@@ -33,17 +33,15 @@ foreach skill of numlist `numb_skills' {
 	loc base = r(min)
     	
 	* Parameters
-	*if "$use_saved_parameters" == "no" {
+	if "$use_saved_parameters" == "no" {
 		mlogit occupation `mnl_rhs'  [pw = wgt] if skill == `skill' & sample ==1, baseoutcome(`base')
-		/*capture mkdir "${data}\models/${country}_${year}"
-		estimates save "${data}\models/${country}_${year}\Status_skill_`skill'.dta", replace
+		capture mkdir "${data_root}/models/${country}_${year}"
+		estimates save "${data_root}/models/${country}_${year}/Status_skill_`skill'.dta", replace
 	}
 	else {
-		estimates use "${data}\models/${country}_${year}\Status_skill_`skill'.dta"
-		estimates esample: occupation `mnl_rhs' [aw = pondera] if
-       skill == `skill' & sample ==1, baseoutcome(`base')
-
-	}*/
+		estimates use "${data_root}/models/${country}_${year}/Status_skill_`skill'.dta"
+		estimates esample: occupation `mnl_rhs' [aw = pondera] if skill == `skill' & sample ==1, baseoutcome(`base')
+	}
 
 	*=========================================================================
 	* residuals

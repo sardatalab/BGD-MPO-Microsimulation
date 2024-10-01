@@ -20,7 +20,7 @@
 	local cpiversion="09"	
 	
 	* Make DLW directory
-	cap mkdir "$data_in/DLW"
+	cap mkdir "$data_root/DLW"
 	
 	* Download CPI from datalibweb, in Windows
 	if "`c(os)'"=="Windows" {
@@ -31,10 +31,10 @@
 				noi di as error "Note: Downloading data from datalibweb failed. Verify connection"
 				exit
 			}
-			else save "$data_in/DLW/datalib_support_2005_GMDRAW.dta", replace
+			else save "$data_root/DLW/datalib_support_2005_GMDRAW.dta", replace
 		}
 		if "$reload_dlw"=="" {
-			cap use "$data_in/DLW/datalib_support_2005_GMDRAW.dta", clear
+			cap use "$data_root/DLW/datalib_support_2005_GMDRAW.dta", clear
 			if _rc {
 				noi di as error "CPI data not found. Download it using datalibweb in Windows"
 				exit
@@ -47,7 +47,7 @@
 		noi di ""
 		noi di as text `"Note: MacOSX/Unix, datalibweb skipped. CPI data should exist alreay in the "$data_in/DLW" folder"'
 		
-		cap use "$data_in/DLW/datalib_support_2005_GMDRAW.dta", clear
+		cap use "$data_root/DLW/datalib_support_2005_GMDRAW.dta", clear
 		if _rc {
 			noi di as error "CPI data not found. Download it using datalibweb in Windows"
 			exit
@@ -64,7 +64,7 @@
 	
 	
 	* Year: 2022
-	if `year'==2022 {
+	if `year0'==2022 {
 		
 		if c(os)=="Windows" {
 		
@@ -77,9 +77,9 @@
 				}
 			
 				else {
-					save "$data_in/DLW/`r(filename)'", replace
+					save "$data_root/DLW/HIES/`r(filename)'", replace
 					noi di "`r(filename)'"
-					global `module' "$data_in/DLW/`r(filename)'"
+					global `module' "$data_root/DLW/HIES/`r(filename)'"
 				}
 			}
 		}
@@ -88,7 +88,7 @@
 			noi di ""
 			noi di as text "Windows, datalibweb skipped"
 			foreach module in LBR INC IND GMD {
-				global `module' "$data_in/DLW/BGD_2022_HIES_v02_M_v03_A_SARMD_`module'.dta"
+				global `module' "$data_root/DLW/HIES/BGD_2022_HIES_v02_M_v03_A_SARMD_`module'.dta"
 			}
 		}
 		
@@ -98,20 +98,20 @@
 			noi di ""
 			noi di as text "MacOSX, datalibweb skipped"
 			foreach module in LBR INC IND {	
-				global `module' "$data_in/DLW/BGD_2022_HIES_v02_M_v03_A_SARMD_`module'.dta"
+				global `module' "$data_root/DLW/HIES/BGD_2022_HIES_v02_M_v03_A_SARMD_`module'.dta"
 			}
 		}
 	}
 	
 	* Year: 2016 (legacy)
-	if `year'==2016 {
+	if `year0'==2016 {
 		global LBR "C:/Users/wb553773/OneDrive - WBG/BD/BGD Poverty Assessment 2023/Data/HIES 2016/BGD_2016_HIES_v01_M_v06_A_SARMD_LBR"
 		global INC "C:/Users/wb553773/OneDrive - WBG/BD/BGD Poverty Assessment 2023/Data/HIES 2016/BGD_2016_HIES_v01_M_v06_A_SARMD_INC"
 		global IND "C:/Users/wb553773/OneDrive - WBG/BD/BGD Poverty Assessment 2023/Data/HIES 2016/BGD_2016_HIES_v01_M_v06_A_SARMD_IND"
 	}
 	
 	* Year: 2010 (legacy)
-	if `year'==2010 {
+	if `year0'==2010 {
 		global LBR "C:/Users/wb553773/OneDrive - WBG/BD/BGD Poverty Assessment 2023/Data/HIES 2010/BGD_2010_HIES_v01_M_v07_A_SARMD_LBR"
 		global INC "C:/Users/wb553773/OneDrive - WBG/BD/BGD Poverty Assessment 2023/Data/HIES 2010/BGD_2010_HIES_v01_M_v07_A_SARMD_INC"
 		global IND "C:/Users/wb553773/OneDrive - WBG/BD/BGD Poverty Assessment 2023/Data/HIES 2010/BGD_2010_HIES_v01_M_v07_A_SARMD_IND"
@@ -145,6 +145,14 @@
 	drop if _merge==2
 	drop _merge
 
+	* Fix lstatus
+	* lstatus_year will be replaced by the definition of lstatus
+	rename  lstatus lstatus_0 
+	gen     lstatus = lstatus_0
+	replace lstatus = 1	if  ila!=0 & ila!=.
+	replace lstatus = 3 if age<=4 
+	
+	
 	* Rename labels
 	cap lab def industrycat10_year 1 "Agriculture, Hunting, Fishing, etc." 2 "Mining" 3 "Manufacturing"  4 "Public Utility Services"  5 "Construction"  6 "Commerce" 7 "Transport and Communications" 8 "Financial and Business Services"  9 "Public Administration"  10 "Others Services, Unspecified", replace
 	cap lab val industrycat10_year industrycat10_year
@@ -177,6 +185,7 @@
 	cap lab val lstatus lstatus
 
 	* Recode industry variable to match macro aggregation
+	/*
 	clonevar industry6=industrycat10_year
 	recode industry6 (3=2) (4=2) (5=3) (6=4) (7=5) (8=6) (9=4) (10=4)
 	cap lab def industry6 1 "Agriculture" 2 "Industry" 3 "Construction"  4 "Services" 5 "Transport" 6 "Finance", replace
@@ -186,16 +195,98 @@
 	recode industry6_2 (3=2) (4=2) (5=3) (6=4) (7=5) (8=6) (9=4) (10=4)
 	cap lab def industry6_2 1 "Agriculture" 2 "Industry" 3 "Construction"  4 "Services" 5 "Transport" 6 "Finance", replace
 	cap lab val industry6_2 industry6_2
-
+	*/
+	
+	if $sector_model==6 {
+		gen industry_imp = .
+			replace industry_imp = 1 if industrycat10_year==1	// agriculture
+			replace industry_imp = 2 if industrycat10_year==5	// construction
+			replace industry_imp = 3 if industrycat10_year==2|industrycat10_year==3	// rest of industry			
+			replace industry_imp = 4 if industrycat10_year==7	// transport
+			replace industry_imp = 5 if industrycat10_year==8	// financial
+			replace industry_imp = 6 if industrycat10_year==4|industrycat10_year==6|industrycat10_year==9|industrycat10_year==10
+			replace industry_imp = 6 if industrycat10_year==. & lstatus==1 // 7 observations representing 11,234 weighted individuals
+			#delimit ;
+			label define lblindustry_imp 
+				1 "Agriculture"
+				2 "Construction"
+				3 "Rest of Industry"
+				4 "Transport"
+				5 "Finance"
+				6 "Rest of Services";
+			#delimit cr
+			label values industry_imp lblindustry_imp
+		
+		gen industry_imp_2
+			replace industry_imp_2 = 1 if industrycat10_2_year==1	// agriculture
+			replace industry_imp_2 = 2 if industrycat10_2_year==5	// construction
+			replace industry_imp_2 = 3 if industrycat10_2_year==2|industrycat10_year==3	// rest of industry			
+			replace industry_imp_2 = 4 if industrycat10_2_year==7	// transport
+			replace industry_imp_2 = 5 if industrycat10_2_year==8	// financial
+			replace industry_imp_2 = 6 if industrycat10_2_year==4|industrycat10_year==6|industrycat10_year==9|industrycat10_year==10
+			replace industry_imp_2 = 6 if industrycat10_2_year==. & lstatus==1 // 7 observations representing 11,234 weighted individuals
+			#delimit ;
+			label define lblindustry_imp_2
+				1 "Agriculture"
+				2 "Construction"
+				3 "Rest of Industry"
+				4 "Transport"
+				5 "Finance"
+				6 "Rest of Services";
+			#delimit cr
+			label values industry_imp_2 lblindustry_imp_2
+			
+		rename industry_imp_2 industry6_2
+	}
+	
+	if $sector_model==3 {
+		gen industry_imp = .
+			replace industry_imp = 1 if industrycat10_year==1	// agriculture
+			replace industry_imp = 2 if industrycat10_year==5	// construction
+			replace industry_imp = 2 if industrycat10_year==2|industrycat10_year==3	// rest of industry			
+			replace industry_imp = 3 if industrycat10_year==7	// transport
+			replace industry_imp = 3 if industrycat10_year==8	// financial
+			replace industry_imp = 3 if industrycat10_year==4|industrycat10_year==6|industrycat10_year==9|industrycat10_year==10
+			replace industry_imp = 3 if industrycat10_year==. & lstatus==1 // 7 observations representing 11,234 weighted individuals
+			#delimit ;
+			label define lblindustry_imp 
+				1 "Agriculture"
+				2 "Industry"
+				3 "Services";
+			#delimit cr
+			label values industry_imp lblindustry_imp
+		rename industry_imp industry3
+		
+		gen industry_imp_2 = .
+			replace industry_imp_2 = 1 if industrycat10_2_year==1	// agriculture
+			replace industry_imp_2 = 2 if industrycat10_2_year==5	// construction
+			replace industry_imp_2 = 2 if industrycat10_2_year==2|industrycat10_year==3	// rest of industry			
+			replace industry_imp_2 = 3 if industrycat10_2_year==7	// transport
+			replace industry_imp_2 = 3 if industrycat10_2_year==8	// financial
+			replace industry_imp_2 = 3 if industrycat10_2_year==4|industrycat10_year==6|industrycat10_year==9|industrycat10_year==10
+			replace industry_imp_2 = 3 if industrycat10_2_year==. & lstatus==1 // 7 observations representing 11,234 weighted individuals
+			#delimit ;
+			label define lblindustry_imp_2 
+				1 "Agriculture"
+				2 "Industry"
+				3 "Services";
+			#delimit cr
+			label values industry_imp lblindustry_imp_2
+		rename industry_imp_2 industry3_2
+		
+	}	
+	
+	
+	
 	* Incorporate IMP module (legacy)
-	if `year'==2016 {
+	if `year0'==2016 {
 		destring idh, replace
 		clonevar hhold=idh
 		merge m:1 hhold using "C:/Users/wb553773/OneDrive - WBG/BD/BGD Poverty Assessment 2023/Data/HIES 2016/BGD_2016_HIES_v01_M_v06_A_SARMD_IND_imp", keepusing(index)
 	}
 
 	* Incorporate IMP module (legacy)
-	if `year'==2010 {
+	if `year0'==2010 {
 		destring idh, replace
 		clonevar hhold=idh
 		merge m:1 hhold using "C:/Users/wb553773/OneDrive - WBG/BD/BGD Poverty Assessment 2023/Data/HIES 2010/BGD_2010_HIES_v01_M_v06_A_SARMD_IND_imp", keepusing(index10)
@@ -203,7 +294,7 @@
 
 
 	* Incorporate povextline (needs to be updated)
-	if `year'==2022 & "`c(username)'"=="WB553773" {
+	if `year0'==2022 & "`c(username)'"=="WB553773" {
 		*merge with updated welfare (consumption)
 		gen hhidseq = substr(hhid, strpos(hhid, "-") + 1, .)
 		destring hhidseq , replace
@@ -217,24 +308,16 @@
 		rename zu_cbn povline
 	}
 	
-	* Tabulations
-	tab industry6 [iw=wgt]
 
-	if `year'==2016 {
+	if `year0'==2016 {
 		replace ila = ila * index
 		replace ip = ip*index
 	}
 
-	if `year'==2010 {
+	if `year0'==2010 {
 		replace ila = ila * index10
 		replace ip = ip*index10
 	}
-
-	tabstat ila ip [aw=wgt], by(industry6)
-
-	tab lstatus [iw=wgt]
-
-	tab lstatus_year [iw=wgt]
 
 	gen workage=0
 	replace workage=1 if age>=15 & age<=64

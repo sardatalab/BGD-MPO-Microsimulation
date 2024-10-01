@@ -228,18 +228,29 @@ if "`processunwpp'"=="yes" {
 	replace var = "unpop_65up" if title==103
 	
 	order country var
+		
+	preserve
+		collapse (sum) pop1950 - pop2100 if title==102|title==103, by(country)
+		gen var = "unpop_15up"
+		gen title = 104
+		order country var title
+		tempfile pop15up
+		save `pop15up'
+	restore	
 	
 	preserve
 		collapse (sum) pop1950 - pop2100, by(country)
 		gen var = "unpop_total"
-		gen title = 104
+		gen title = 105
 		order country var title
 		tempfile poptotal
 		save `poptotal'
 	restore
 	
+	
 	append using `poptotal'
-	label define lbltitle 104 "UN Population, total", add 
+	append using `pop15up'
+	label define lbltitle 104 "UN Population, 15up" 105 "UN Population, total", add 
 	reshape long pop, i(country var title) j(year)
 	keep if year>=2000 & year<=2030
 	format pop %20.0f 
@@ -260,9 +271,11 @@ if "`processunwpp'"=="yes" {
 	save `unpopdata', replace
 	
 	* Import WDI data
-	* wbopendata, indicator(SP.POP.TOTL; SP.POP.1564.TO) long clear
-	* save "$data_in/UN WPP/wdi_popdata.dta", replace
-	use "$data_in/UN WPP/wdi_popdata.dta", clear
+	*wbopendata, indicator(SP.POP.0014.TO; SP.POP.TOTL; SP.POP.1564.TO; SP.POP.65UP.TO) projection long clear
+	*save "$data_in/UN WPP/wdi_popdata.dta", replace
+	use if year>=2000 & year<=2030 using "$data_in/UN WPP/wdi_popdata.dta", clear
+	
+	egen double sp_pop_15up_to = rsum(sp_pop_1564_to sp_pop_65up_to)
 	
 	rename countrycode country
 	keep if inlist(country,"AFG","BGD","BTN","IND","MDV", "NPL","PAK","LKA")
@@ -273,8 +286,11 @@ if "`processunwpp'"=="yes" {
 	gen date = "`c(current_date)'"
 	
 	gen title = .
-	replace title = 114 if indicator=="wbsp_pop_totl"
+	replace title = 111 if indicator=="wbsp_pop_0014_to"
 	replace title = 112 if indicator=="wbsp_pop_1564_to"
+	replace title = 113 if indicator=="wbsp_pop_65up_to"
+	replace title = 114 if indicator=="wbsp_pop_15up_to"
+	replace title = 115 if indicator=="wbsp_pop_totl"
 	
 	label values title lbltitle
 		
@@ -283,11 +299,12 @@ if "`processunwpp'"=="yes" {
 	
 	append using `unpopdata'
 	
-	label define lbltitle 101 "Population, 0-14 (UN)" 	102 "Population, 15-64 (UN)" 103 "Population, 65+ (UN)" 104 "Population, total (UN)", add
-	label define lbltitle                          		112 "Population, 15-64 (WDI)"                     		114 "Population, total (WDI)" , add
+	label define lbltitle 101 "Population, 0-14 (UN)" 	102 "Population, 15-64 (UN)"  103 "Population, 65+ (UN)"  104 "Population, total (UN)", add
+	label define lbltitle 111 "Population, 0-14 (WDI)"	112 "Population, 15-64 (WDI)" 113 "Population, 65+ (WDI)" 114 "Population, total (WDI)" , add
 	label values title lbltitle	
 	
 	save "$data_in/UN WPP/popdata_sar_mpo.dta", replace
+	
 }
 
 

@@ -18,17 +18,46 @@ gen ipcf_ppp17=(12/365)*ipcf/cpi2017/icp2017
 
 gen welfarenom_ppp17=(12/365)*welfarenom/cpi2017/icp2017
 
-clonevar emplyd     = lstatus_year if ipcf_ppp17 != .
+gen emplyd     = (lstatus==1)  if ipcf_ppp17 != .
 gen unemplyd   = (lstatus==2)  if ipcf_ppp17 != .
 *gen      male       = (hombre==1)
 replace male = . if male!=1
 
 clonevar edad = age
 * age sample
-gen sample = 1 if inrange(edad,15,64)
+gen sample = 1 if inrange(edad,15,100)
 
 clonevar id=hhid
 
+
+local skill_occup ""
+
+* education variables
+* education level (aggregate primary and none)
+//replace educ_lev = 1 if educ_lev  ==0 
+	
+gen educ_level = educat7
+replace educ_lev = 1 if educ_lev ==0
+
+gen     skill_edu = 1 if educ_lev <= 4 &                  sample == 1 
+replace skill_edu = 2 if educ_lev >= 4 & educ_level!=. &  sample == 1 
+clonevar skill = skill_edu
+
+* Two types of workers s0 and s1
+*********************************		
+	qui cap drop d_s
+	qui gen d_s = .
+		replace d_s = 1 if occup_year>=1 & occup_year<=3 & lstatus==1 & sample==1
+		replace d_s = 1 if occup_year==6          		 & lstatus==1 & sample==1
+		replace d_s = 0 if ((occup_year==4|occup_year==5)|(occup_year>=7 & occup_year!=.)) & sample==1
+		replace d_s = 0 if occup_year==. & educ_level<=5                 & sample==1
+		replace d_s = 1 if occup_year==. & educ_level>=5 & educ_level!=. & sample==1
+		replace d_s = 0 if occup_year==. & educ_level==. 			     & sample==1
+	label define lbld_s 0 "Unskilled" 1 "Skilled"
+	label values d_s lbld_s
+
+gen     skill_occup = 0 if d_s == 0
+replace skill_occup = 1 if d_s == 1
 
 *===========================================================================
 * PPP adjustment factor
@@ -85,33 +114,66 @@ else {
 */
 
 * primary activity
-gen     sect_main6 = .
-replace sect_main6 = 1 if  industry6 == 1 & emplyd == 1 
-replace sect_main6 = 2 if  industry6 == 2 & emplyd == 1 
-replace sect_main6 = 3 if  industry6 == 3 & emplyd == 1 
-replace sect_main6 = 4 if  industry6 == 4 & emplyd == 1 
-replace sect_main6 = 5 if  industry6 == 5 & emplyd == 1
-replace sect_main6 = 6 if  industry6 == 6 & emplyd == 1 
-label var sect_main6 "main economic sector" 
+if $sector_model==6 {
+	gen     sect_main6 = .
+	replace sect_main6 = 1 if  industry6 == 1 & emplyd == 1 
+	replace sect_main6 = 2 if  industry6 == 2 & emplyd == 1 
+	replace sect_main6 = 3 if  industry6 == 3 & emplyd == 1 
+	replace sect_main6 = 4 if  industry6 == 4 & emplyd == 1 
+	replace sect_main6 = 5 if  industry6 == 5 & emplyd == 1
+	replace sect_main6 = 6 if  industry6 == 6 & emplyd == 1 
+	label var sect_main6 "main economic sector" 
 
-* secondary activity
-gen     sect_secu6 = .
-replace sect_secu6 = 1 if  industry6_2 == 1 & emplyd == 1 
-replace sect_secu6 = 2 if  industry6_2 == 2 & emplyd == 1 
-replace sect_secu6 = 3 if  industry6_2 == 3 & emplyd == 1 
-replace sect_secu6 = 4 if  industry6_2 == 4 & emplyd == 1 
-replace sect_secu6 = 5 if  industry6_2 == 5 & emplyd == 1
-replace sect_secu6 = 6 if  industry6_2 == 6 & emplyd == 1
-label var sect_secu6  "secondary economic sector" 
+	* secondary activity
+	gen     sect_secu6 = .
+	replace sect_secu6 = 1 if  industry6_2 == 1 & emplyd == 1 
+	replace sect_secu6 = 2 if  industry6_2 == 2 & emplyd == 1 
+	replace sect_secu6 = 3 if  industry6_2 == 3 & emplyd == 1 
+	replace sect_secu6 = 4 if  industry6_2 == 4 & emplyd == 1 
+	replace sect_secu6 = 5 if  industry6_2 == 5 & emplyd == 1
+	replace sect_secu6 = 6 if  industry6_2 == 6 & emplyd == 1
+	label var sect_secu6  "secondary economic sector" 
 
-label def sectors         ///
-1 "Agriculture"   ///
-2 "Industry" ///
-3 "Construction"   ///
-4 "Services" ///
-5 "Transport"   ///
-6 "Finance", replace
-label values sect_main6 sect_secu6 sectors
+	label def sectors         ///
+	1 "Agriculture"   ///
+	2 "Construction" ///
+	3 "Rest of industry"   ///
+	4 "Transport" ///
+	5 "Finance"   ///
+	6 "Rest of services", replace
+	label values sect_main6 sect_secu6 sectors
+}
+
+* primary activity
+if $sector_model==3 {
+	gen     sect_main = .
+	replace sect_main = 1 if  industry3 == 1 & emplyd == 1 & skill_occup==0
+	replace sect_main = 2 if  industry3 == 1 & emplyd == 1 & skill_occup==1
+	replace sect_main = 3 if  industry3 == 2 & emplyd == 1 & skill_occup==0
+	replace sect_main = 4 if  industry3 == 2 & emplyd == 1 & skill_occup==1
+	replace sect_main = 5 if  industry3 == 3 & emplyd == 1 & skill_occup==0
+	replace sect_main = 6 if  industry3 == 3 & emplyd == 1 & skill_occup==1
+	label var sect_main "main economic sector" 
+
+	* secondary activity
+	gen     sect_secu = .
+	replace sect_secu = 1 if  industry3_2 == 1 & emplyd == 1 & skill_occup==0
+	replace sect_secu = 2 if  industry3_2 == 1 & emplyd == 1 & skill_occup==1
+	replace sect_secu = 3 if  industry3_2 == 2 & emplyd == 1 & skill_occup==0
+	replace sect_secu = 4 if  industry3_2 == 2 & emplyd == 1 & skill_occup==1
+	replace sect_secu = 5 if  industry3_2 == 3 & emplyd == 1 & skill_occup==0
+	replace sect_secu = 6 if  industry3_2 == 3 & emplyd == 1 & skill_occup==1
+	label var sect_secu  "secondary economic sector" 
+
+	label def sectors         ///
+	1 "Agriculture s0"   ///
+	2 "Agriculture s1"   ///
+	3 "Industry s0"   ///
+	4 "Industry s1"   ///
+	5 "Services s0"		///
+	6 "Services s1"		, replace 
+	label values sect_main sect_secu sectors
+}
 
 * labor relationship
 gen salaried = empstat_year==1 if emplyd==1
@@ -148,10 +210,9 @@ label values labor_rel labor_rel2 lab_rel
 gen     public_job = 0 if emplyd ==1
 replace public_job = 1 if emplyd == 1 & ocusec_year==1
 
-note: by definiton the public job is part of formal services sector
-
-replace industry6  = 4 if !inlist(industry6, 4) & public_job ==1 & industry6!= .
-replace sect_main6 = 4 if !inlist(sect_main6,4) & public_job ==1 & sect_main6 != .
+*note: by definiton the public job is part of formal services sector
+*replace industry6  = 4 if !inlist(industry6, 4) & public_job ==1 & industry6!= .
+*replace sect_main6 = 4 if !inlist(sect_main6,4) & public_job ==1 & sect_main6 != .
 
 *===========================================================================
 * Checking income variables
@@ -231,11 +292,7 @@ replace h_nlai   = . if h_nlai == 0
 	others perception:	    perce
 ========================================================================= */
 	
-* education level (aggregate primary and none)
-//replace educ_lev = 1 if educ_lev  ==0 
-	
-gen educ_level = educat7
-replace educ_lev = 1 if educ_lev ==0
+
 
 * marital status
 gen married = (marital==1)
@@ -280,26 +337,26 @@ replace active = 1 if lstatus==2
 replace active = 0 if active != 1
 
 gen     occupation = .
-replace occupation = 0 if  active     == 0          	
-replace occupation = 1 if  unemplyd   == 1	    	  	
-replace occupation = 2 if  sect_main6 == 1
-replace occupation = 3 if  sect_main6 == 2
-replace occupation = 4 if  sect_main6 == 3
-replace occupation = 5 if  sect_main6 == 4
-replace occupation = 6 if  sect_main6 == 5
-replace occupation = 7 if  sect_main6 == 6
+replace occupation = 0  if  active    == 0          	
+replace occupation = 10 if  unemplyd  == 1
+replace occupation = 11 if  sect_main == 1
+replace occupation = 12 if  sect_main == 2
+replace occupation = 13 if  sect_main == 3
+replace occupation = 14 if  sect_main == 4
+replace occupation = 15 if  sect_main == 5
+replace occupation = 16 if  sect_main == 6
 label var occupation "occupation status"
 
-label define occup ///
-0 "inactive" /// 
-1 "unempl"   ///
-2 "agric"  /// 
-3 "ind" ///
-4 "cons" ///
-5 "serv" ///
-6 "transp"  ///
-7 "fin", replace 
-label values occupation occup
+label define occupation ///
+0 "Inactive" /// 
+10 "Unemployed"   ///
+11 "Agriculture s0"  /// 
+12 "Agriculture s1" ///
+13 "Industry s0" ///
+14 "Industry s1" ///
+15 "Services s0"  ///
+16 "Services s1", replace 
+label values occupation occupation
 	
 *===========================================================================
 * Setting up sample 
@@ -307,22 +364,19 @@ label values occupation occup
 
 //local var "ln_lai_m sect_main6 sect_main sect_secu6 sect_secu occupation"
 
-local var "ln_lai_m sect_main6 industry6 occupation"
+local var "ln_lai_m sect_main industry3 occupation"
 
 foreach x of varlist `var' {
     replace `x' = . if sample != 1
 }
 
-* education variables
-gen     sample_1 = 1 if educ_lev <  4 &  sample == 1 
-lab var sample_1 "low educated"
-gen     sample_2 = 1 if educ_lev >= 4 &  sample == 1 
-lab var sample_2 "high educated"
+gen     sample_1 = 1 if skill==1 & sample == 1 
+lab var sample_1 "low skill"
+gen     sample_2 = 1 if skill==2 & sample == 1 
+lab var sample_2 "high skill"
 
-gen     skill = 1 if sample_1 == 1
-replace skill = 2 if sample_2 == 1
-
-
+		
+*/
 
 *===========================================================================
 *                                     END

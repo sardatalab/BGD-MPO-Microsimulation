@@ -1,6 +1,6 @@
 *!v1.0
 *===========================================================================
-* TITLE: 10 - Assign labor income by sector
+* TITLE: 090 - Assign labor income by sector
 *===========================================================================
 * Prepared by: Sergio Olivieri
 * E-mail: solivieri@worldbank.org
@@ -52,9 +52,9 @@ clonevar salaried_s = salaried
 replace  salaried_s = 1 if (ch_l == 1 | ch_h == 1) 
 
 forvalues i = 1/`lim' {
-	sum  ch_l [aw = fexp_s] if sect_main6_s== `i'
+	sum  ch_l [aw = fexp_s] if sect_main_s== `i'
 	if r(sum) != 0 {
-		gen  aux_l_`i' = sum(fexp_s)/r(sum) if ch_l == 1 & sect_main6_s== `i'
+		gen  aux_l_`i' = sum(fexp_s)/r(sum) if ch_l == 1 & sect_main_s== `i'
 		sort aleat_ila, stable
 		replace salaried_s = 0 if  aux_l_`i' <= ns_1_`i'
 		di in ye "share of self employment is ===>   ns_1_`i'  = " scalar(ns_1_`i')
@@ -63,7 +63,7 @@ forvalues i = 1/`lim' {
 
 	sum  ch_h [aw = fexp_s] if occupation_s == `i'
 	if r(sum) != 0 {
-		gen  aux_h_`i' = sum(fexp_s)/r(sum) if ch_h == 1 & sect_main6_s== `i'
+		gen  aux_h_`i' = sum(fexp_s)/r(sum) if ch_h == 1 & sect_main_s== `i'
 		sort aleat_ila, stable
 		replace salaried_s = 0 if  aux_h_`i' <= ns_2_`i'
 		di in ye "share of self employment is ===>   ns_2_`i'  = " scalar(ns_2_`i')
@@ -96,18 +96,18 @@ ta public_job_s
 
 *===========================================================================
 forvalues i = 1/`lim' {
-	sum  ch_l [aw = fexp_s] if sect_main6_s== `i'
+	sum  ch_l [aw = fexp_s] if sect_main_s== `i'
 	if r(sum) != 0 {
-		gen  aux_l_`i' = sum(fexp_s)/r(sum) if ch_l == 1 & sect_main6_s== `i'
+		gen  aux_l_`i' = sum(fexp_s)/r(sum) if ch_l == 1 & sect_main_s== `i'
 		sort aleat_ila, stable
 		replace public_job_s = 0 if  aux_l_`i' <= pj_1_`i'
 		di in ye "share of private employment is ===>   pj_1_`i'  = " scalar(pj_1_`i')
 		ta public_job_s [aw=fexp_s] if aux_l_`i' != .
 	}
 
-	sum  ch_h [aw = fexp_s] if sect_main6_s== `i'
+	sum  ch_h [aw = fexp_s] if sect_main_s== `i'
 	if r(sum) != 0 {
-		gen  aux_h_`i' = sum(fexp_s)/r(sum) if ch_h == 1 & sect_main6_s== `i'
+		gen  aux_h_`i' = sum(fexp_s)/r(sum) if ch_h == 1 & sect_main_s== `i'
 		sort aleat_ila, stable
 		replace public_job_s = 0 if  aux_h_`i' <= pj_2_`i'
 		di in ye "share of private employment is ===>   pj_2_`i'  = " scalar(pj_2_`i')
@@ -216,77 +216,78 @@ if $m == 1 {
 		* Linear projection
 
 		* Those who come from INACTIVITY
-		mat score predila_n  = b_1_`n'  if occupation == 0 & occupation_s == 2 & sample_`n' == 1, replace
-		mat score predila_n  = b_2_`n'  if occupation == 0 & occupation_s == 3 & sample_`n' == 1, replace
-		mat score predila_n  = b_3_`n'  if occupation == 0 & occupation_s == 4 & sample_`n' == 1, replace
-		mat score predila_n  = b_4_`n'  if occupation == 0 & occupation_s == 5 & sample_`n' == 1, replace
-		mat score predila_n  = b_5_`n'  if occupation == 0 & occupation_s == 6 & sample_`n' == 1, replace
-		mat score predila_n  = b_6_`n'  if occupation == 0 & occupation_s == 7 & sample_`n' == 1, replace
+		mat score predila_n  = b_1_`n'  if occupation == 0 & sectorg_s == 1 & sample_`n' == 1, replace
+		mat score predila_n  = b_2_`n'  if occupation == 0 & sectorg_s == 2 & sample_`n' == 1, replace
+		mat score predila_n  = b_3_`n'  if occupation == 0 & sectorg_s == 3 & sample_`n' == 1, replace
+		mat score predila_n  = b_4_`n'  if occupation == 0 & sectorg_s == 4 & sample_`n' == 1, replace
+		mat score predila_n  = b_5_`n'  if occupation == 0 & sectorg_s == 5 & sample_`n' == 1, replace
+		mat score predila_n  = b_6_`n'  if occupation == 0 & sectorg_s == 6 & sample_`n' == 1, replace
 
 		* Those who come from UNEMPLOYMENT
-		mat score predila_n  = b_1_`n'  if occupation == 1 & occupation_s == 2 & sample_`n' == 1, replace
-		mat score predila_n  = b_2_`n'  if occupation == 1 & occupation_s == 3 & sample_`n' == 1, replace
-		mat score predila_n  = b_3_`n'  if occupation == 1 & occupation_s == 4 & sample_`n' == 1, replace
-		mat score predila_n  = b_4_`n'  if occupation == 1 & occupation_s == 5 & sample_`n' == 1, replace
-		mat score predila_n  = b_5_`n'  if occupation == 1 & occupation_s == 6 & sample_`n' == 1, replace
-		mat score predila_n  = b_6_`n'  if occupation == 1 & occupation_s == 7 & sample_`n' == 1, replace
+		mat score predila_n  = b_1_`n'  if occupation == 10 & sectorg_s == 1 & sample_`n' == 1, replace
+		mat score predila_n  = b_2_`n'  if occupation == 10 & sectorg_s == 2 & sample_`n' == 1, replace
+		mat score predila_n  = b_3_`n'  if occupation == 10 & sectorg_s == 3 & sample_`n' == 1, replace
+		mat score predila_n  = b_4_`n'  if occupation == 10 & sectorg_s == 4 & sample_`n' == 1, replace
+		mat score predila_n  = b_5_`n'  if occupation == 10 & sectorg_s == 5 & sample_`n' == 1, replace
+		mat score predila_n  = b_6_`n'  if occupation == 10 & sectorg_s == 6 & sample_`n' == 1, replace
 
-		* Those who come from Agriculture
-		mat score predila_n  = b_2_`n'  if occupation == 2 & occupation_s == 3 & sample_`n' == 1, replace
-		mat score predila_n  = b_3_`n'  if occupation == 2 & occupation_s == 4 & sample_`n' == 1, replace
-		mat score predila_n  = b_4_`n'  if occupation == 2 & occupation_s == 5 & sample_`n' == 1, replace
-		mat score predila_n  = b_5_`n'  if occupation == 2 & occupation_s == 6 & sample_`n' == 1, replace
-		mat score predila_n  = b_6_`n'  if occupation == 2 & occupation_s == 7 & sample_`n' == 1, replace
+		* Those who come from Agriculture s0
+		mat score predila_n  = b_2_`n'  if sectorg == 1 & sectorg_s == 2 & sample_`n' == 1, replace
+		mat score predila_n  = b_3_`n'  if sectorg == 1 & sectorg_s == 3 & sample_`n' == 1, replace
+		mat score predila_n  = b_4_`n'  if sectorg == 1 & sectorg_s == 4 & sample_`n' == 1, replace
+		mat score predila_n  = b_5_`n'  if sectorg == 1 & sectorg_s == 5 & sample_`n' == 1, replace
+		mat score predila_n  = b_6_`n'  if sectorg == 1 & sectorg_s == 6 & sample_`n' == 1, replace
 
-	* Those who come from Industry
-	   mat score predila_n  = b_1_`n'  if occupation == 3 & occupation_s == 2 & sample_`n' == 1, replace
-	   mat score predila_n  = b_3_`n'  if occupation == 3 & occupation_s == 4 & sample_`n' == 1, replace
-	   mat score predila_n  = b_4_`n'  if occupation == 3 & occupation_s == 5 & sample_`n' == 1, replace
-	   mat score predila_n  = b_5_`n'  if occupation == 3 & occupation_s == 6 & sample_`n' == 1, replace
-	   mat score predila_n  = b_6_`n'  if occupation == 3 & occupation_s == 7 & sample_`n' == 1, replace
+	* Those who come from Agriculture s1
+	   mat score predila_n  = b_1_`n'  if sectorg == 2 & sectorg_s == 1 & sample_`n' == 1, replace
+	   mat score predila_n  = b_3_`n'  if sectorg == 2 & sectorg_s == 3 & sample_`n' == 1, replace
+	   mat score predila_n  = b_4_`n'  if sectorg == 2 & sectorg_s == 4 & sample_`n' == 1, replace
+	   mat score predila_n  = b_5_`n'  if sectorg == 2 & sectorg_s == 5 & sample_`n' == 1, replace
+	   mat score predila_n  = b_6_`n'  if sectorg == 2 & sectorg_s == 6 & sample_`n' == 1, replace
 	 
-		* Those who come from Construction
-		mat score predila_n  = b_1_`n'  if occupation == 4 & occupation_s == 2 & sample_`n' == 1, replace
-		mat score predila_n  = b_2_`n'  if occupation == 4 & occupation_s == 3 & sample_`n' == 1, replace
-		mat score predila_n  = b_4_`n'  if occupation == 4 & occupation_s == 5 & sample_`n' == 1, replace
-		mat score predila_n  = b_5_`n'  if occupation == 4 & occupation_s == 6 & sample_`n' == 1, replace
-		mat score predila_n  = b_6_`n'  if occupation == 4 & occupation_s == 7 & sample_`n' == 1, replace
+		* Those who come from Industry s0
+		mat score predila_n  = b_1_`n'  if sectorg == 3 & sectorg_s == 1 & sample_`n' == 1, replace
+		mat score predila_n  = b_2_`n'  if sectorg == 3 & sectorg_s == 2 & sample_`n' == 1, replace
+		mat score predila_n  = b_4_`n'  if sectorg == 3 & sectorg_s == 4 & sample_`n' == 1, replace
+		mat score predila_n  = b_5_`n'  if sectorg == 3 & sectorg_s == 5 & sample_`n' == 1, replace
+		mat score predila_n  = b_6_`n'  if sectorg == 3 & sectorg_s == 6 & sample_`n' == 1, replace
 
-		* Those who come from Services
-		mat score predila_n  = b_1_`n'  if occupation == 5 & occupation_s == 2 & sample_`n' == 1, replace
-		mat score predila_n  = b_2_`n'  if occupation == 5 & occupation_s == 3 & sample_`n' == 1, replace
-		mat score predila_n  = b_3_`n'  if occupation == 5 & occupation_s == 4 & sample_`n' == 1, replace
-		mat score predila_n  = b_5_`n'  if occupation == 5 & occupation_s == 6 & sample_`n' == 1, replace
-		mat score predila_n  = b_6_`n'  if occupation == 5 & occupation_s == 7 & sample_`n' == 1, replace
+		* Those who come from Industry s1
+		mat score predila_n  = b_1_`n'  if sectorg == 4 & sectorg_s == 1 & sample_`n' == 1, replace
+		mat score predila_n  = b_2_`n'  if sectorg == 4 & sectorg_s == 2 & sample_`n' == 1, replace
+		mat score predila_n  = b_3_`n'  if sectorg == 4 & sectorg_s == 3 & sample_`n' == 1, replace
+		mat score predila_n  = b_5_`n'  if sectorg == 4 & sectorg_s == 5 & sample_`n' == 1, replace
+		mat score predila_n  = b_6_`n'  if sectorg == 4 & sectorg_s == 6 & sample_`n' == 1, replace
 
-		* Those who come from Transport
-		mat score predila_n  = b_1_`n'  if occupation == 6 & occupation_s == 2 & sample_`n' == 1, replace
-		mat score predila_n  = b_2_`n'  if occupation == 6 & occupation_s == 3 & sample_`n' == 1, replace
-		mat score predila_n  = b_3_`n'  if occupation == 6 & occupation_s == 4 & sample_`n' == 1, replace
-		mat score predila_n  = b_4_`n'  if occupation == 6 & occupation_s == 5 & sample_`n' == 1, replace
-		mat score predila_n  = b_6_`n'  if occupation == 6 & occupation_s == 7 & sample_`n' == 1, replace
+		* Those who come from Services s0
+		mat score predila_n  = b_1_`n'  if occupation == 5 & sectorg_s == 1 & sample_`n' == 1, replace
+		mat score predila_n  = b_2_`n'  if occupation == 5 & sectorg_s == 2 & sample_`n' == 1, replace
+		mat score predila_n  = b_3_`n'  if occupation == 5 & sectorg_s == 3 & sample_`n' == 1, replace
+		mat score predila_n  = b_4_`n'  if occupation == 5 & sectorg_s == 4 & sample_`n' == 1, replace
+		mat score predila_n  = b_6_`n'  if occupation == 5 & sectorg_s == 6 & sample_`n' == 1, replace
 
-	* Those who come from Finance
-	   mat score predila_n  = b_1_`n'  if occupation == 7 & occupation_s == 2 & sample_`n' == 1, replace
-	   mat score predila_n  = b_2_`n'  if occupation == 7 & occupation_s == 3 & sample_`n' == 1, replace
-	   mat score predila_n  = b_3_`n'  if occupation == 7 & occupation_s == 4 & sample_`n' == 1, replace
-	   mat score predila_n  = b_4_`n'  if occupation == 7 & occupation_s == 5 & sample_`n' == 1, replace
-	   mat score predila_n  = b_5_`n'  if occupation == 7 & occupation_s == 6 & sample_`n' == 1, replace
+	* Those who come from Services s1
+	   mat score predila_n  = b_1_`n'  if occupation == 6 & sectorg_s == 1 & sample_`n' == 1, replace
+	   mat score predila_n  = b_2_`n'  if occupation == 6 & sectorg_s == 2 & sample_`n' == 1, replace
+	   mat score predila_n  = b_3_`n'  if occupation == 6 & sectorg_s == 3 & sample_`n' == 1, replace
+	   mat score predila_n  = b_4_`n'  if occupation == 6 & sectorg_s == 4 & sample_`n' == 1, replace
+	   mat score predila_n  = b_5_`n'  if occupation == 6 & sectorg_s == 5 & sample_`n' == 1, replace
 
 		* Residuals   
-		replace   predila_n = predila_n + invnorm(aleat_ila)* sigma_1_`n' if occupation_s == 2 & sample_`n' == 1 
-		replace   predila_n = predila_n + invnorm(aleat_ila)* sigma_2_`n' if occupation_s == 3 & sample_`n' == 1
-		replace   predila_n = predila_n + invnorm(aleat_ila)* sigma_3_`n' if occupation_s == 4 & sample_`n' == 1
-		replace   predila_n = predila_n + invnorm(aleat_ila)* sigma_4_`n' if occupation_s == 5 & sample_`n' == 1
-		replace   predila_n = predila_n + invnorm(aleat_ila)* sigma_5_`n' if occupation_s == 6 & sample_`n' == 1
-		replace   predila_n = predila_n + invnorm(aleat_ila)* sigma_6_`n' if occupation_s == 7 & sample_`n' == 1
+		replace   predila_n = predila_n + invnorm(aleat_ila)* sigma_1_`n' if sectorg_s == 1 & sample_`n' == 1 
+		replace   predila_n = predila_n + invnorm(aleat_ila)* sigma_2_`n' if sectorg_s == 2 & sample_`n' == 1
+		replace   predila_n = predila_n + invnorm(aleat_ila)* sigma_3_`n' if sectorg_s == 3 & sample_`n' == 1
+		replace   predila_n = predila_n + invnorm(aleat_ila)* sigma_4_`n' if sectorg_s == 4 & sample_`n' == 1
+		replace   predila_n = predila_n + invnorm(aleat_ila)* sigma_5_`n' if sectorg_s == 5 & sample_`n' == 1
+		replace   predila_n = predila_n + invnorm(aleat_ila)* sigma_6_`n' if sectorg_s == 6 & sample_`n' == 1
 	}
 
 	replace predila_n = exp(predila_n)
 
 	* those who mantain their employment status and sector
 	gen     lai_m_s = .
-	forvalues i = 2/7 {
+	levelsof occupation if occupation>10, local(alloccups)
+	foreach i of local alloccups {
 		* Those who mantain their employment status and sector
 		replace lai_m_s = lai_m if occupation == `i' & occupation_s == `i'                
 		replace lai_m_s = .     if occupation == `i' & occupation_s == `i' & (lai_m == .) 
@@ -295,18 +296,18 @@ if $m == 1 {
 	}
 
 	* 2- New employed who come from other sectors, non-employed or unemployed 
-	replace lai_m_s = predila_n  if occupation_s == 2 & lai_m_s == .
-	replace lai_m_s = predila_n  if occupation_s == 3 & lai_m_s == .
-	replace lai_m_s = predila_n  if occupation_s == 4 & lai_m_s == .
-	replace lai_m_s = predila_n  if occupation_s == 5 & lai_m_s == .
-	replace lai_m_s = predila_n  if occupation_s == 6 & lai_m_s == .
-	replace lai_m_s = predila_n  if occupation_s == 7 & lai_m_s == .
+	replace lai_m_s = predila_n  if sectorg_s == 1 & lai_m_s == .
+	replace lai_m_s = predila_n  if sectorg_s == 2 & lai_m_s == .
+	replace lai_m_s = predila_n  if sectorg_s == 3 & lai_m_s == .
+	replace lai_m_s = predila_n  if sectorg_s == 4 & lai_m_s == .
+	replace lai_m_s = predila_n  if sectorg_s == 5 & lai_m_s == .
+	replace lai_m_s = predila_n  if sectorg_s == 6 & lai_m_s == .
 
 
 
 
 * Summ those who do not belong to the sample
-replace lai_m_s = lai_m  if lai_m_s == . &  sect_main6_s!= . & sample == .
+replace lai_m_s = lai_m  if lai_m_s == . &  sectorg_s!= . & sample == .
 replace lai_m_s = lai_m  if lai_m_s == . &  lai_m != . & sample == .
 replace lai_m_s = lai_m  if lai_m_s == . &  lai_m != . & sample == 1
 

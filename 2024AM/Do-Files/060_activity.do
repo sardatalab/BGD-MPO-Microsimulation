@@ -23,7 +23,8 @@ mat activity = r(mean)*(1 + growth_labor[1,1])
 mat list activity
 
 * allocate individuals according to their utility of being inactive
-clonevar  active_s = lf_samp
+*clonevar  active_s = lf_samp
+clonevar  active_s = active
 clonevar U0 = U0_1 
 replace  U0 = U0_2 if U0 == .
 gsort -active_s U0 hhid 
