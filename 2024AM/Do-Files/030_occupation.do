@@ -40,7 +40,7 @@ foreach skill of numlist `numb_skills' {
 	}
 	else {
 		estimates use "${data_root}/models/${country}_${year}/Status_skill_`skill'.dta"
-		estimates esample: occupation `mnl_rhs' [aw = pondera] if skill == `skill' & sample ==1, baseoutcome(`base')
+		estimates esample: occupation `mnl_rhs' [aw = wgt] if skill == `skill' & sample ==1, baseoutcome(`base')
 	}
 
 	*=========================================================================

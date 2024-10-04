@@ -18,6 +18,10 @@
 * TIME
 *===============================================================================
 set processors 4
+set type double
+frame reset
+program drop _all
+clear mata
 capture which etime
 if _rc ssc install etime
 etime, start
@@ -38,10 +42,10 @@ etime, start
 	local  step3_runsim	  "yes" 	// Run simulations	
 		
 	* Initial and final year for sequential run
-		local iniyear = 2023	// Initial year when doing sequential runs
-		local finyear = 2023	// Final year when doing sequential runs
+		local iniyear = 2022 // Initial year when doing sequential runs
+		local finyear = 2026 // Final year when doing sequential runs
 
-	* Local parallel
+	* *local parallel
 		*local parallel 	"yes"	// If "yes", the program will run simulation parallel mode
 
 	* Parallel run set up
@@ -160,10 +164,12 @@ etime, start
 				* Copy batch file
 				!copy "0 master.do" "batch_`bi'.do"
 				* Replace _fake xrxx and xryy with initial and final years
-				!powershell -command " (Get-Content batch_`bi'.do) -replace 'iniyear=2024', 'iniyear=`bi'' | Out-File -encoding ASCII batch_`bi'.do "
-				!powershell -command " (Get-Content batch_`bi'.do) -replace 'finyear=2024', 'finyear=`bi'' | Out-File -encoding ASCII batch_`bi'.do "
+				*!powershell -command " (Get-Content batch_`bi'.do) -replace 'iniyear=2024', 'iniyear=`bi'' | Out-File -encoding ASCII batch_`bi'.do "
+				*!powershell -command " (Get-Content batch_`bi'.do) -replace 'finyear=2024', 'finyear=`bi'' | Out-File -encoding ASCII batch_`bi'.do "
 				* Turn off parallel option
-				!powershell -command " (Get-Content batch_`bi'.do) -replace '*local parallel', '**local parallel' | Out-File -encoding ASCII batch_`bi'.do "
+				*!powershell -command " (Get-Content batch_`bi'.do) -replace '*local parallel', '**local parallel' | Out-File -encoding ASCII batch_`bi'.do "
+				
+				!powershell -command " (Get-Content batch_`bi'.do) -replace 'iniyear=2024', 'iniyear=`bi'' | Out-File -encoding ASCII batch_`bi'.do ; (Get-Content batch_`bi'.do) -replace 'finyear=2024', 'finyear=`bi'' | Out-File -encoding ASCII batch_`bi'.do ; (Get-Content batch_`bi'.do) -replace '*local parallel', '**local parallel' | Out-File -encoding ASCII batch_`bi'.do"
 				
 				* Append line to myscript.sh
 				if `bi'==`iniparallelyear' file write myscript `"   "`c(sysdir_stata)'/StataMP-64" /e /i do batch_`bi'.do "'
@@ -209,12 +215,13 @@ if "`step1_loadhhdata'"=="yes" & "`parallel'"=="" {
 	#delimit ;
 	local minvarset "year countrycode subnatid1 urban
 					hhid pid wgt hsize h_size
-					age male edad atschool educ_lev id	married h_head
+					age male edad relationharm id married h_head
+					atschool educ_lev 
 					active emplyd unemplyd self_emp unpaid salaried salaried2 self_emp2 unpaid2
 					labor_rel labor_rel2 public_job
 					sect_main sect_secu  
 					occupation
-					skill_edu 	skill_occup	skill
+					skill_edu  skill_occup	skill
 					sample sample_1 sample_2
 					h_inc 
 					h_lai 
@@ -233,12 +240,20 @@ if "`step1_loadhhdata'"=="yes" & "`parallel'"=="" {
 					tot_lai
 					lai_s
 					food_share nfood_share
-					pline_int pline_nat welfarenom_ppp17";
+					ipcf_ppp17
+					pline_int pline_nat welfarenat welfarenom_ppp17 cpi2017 icp2017";
 
 	#delimit cr
 	keep `minvarset'	
 
 	compress
+	
+		global use_saved_parameters "no"
+		* 030.model labor incomes by groups
+			do "$dofiles/030_occupation.do"
+		* 040.model labor incomes by skills
+			do "$dofiles/040_labor_income.do"
+	
 	
 	save "$data_root/BGD_2022_HIES_v02_M_v02_A_SARMD_SIM_MIN.dta", replace
 
@@ -353,6 +368,7 @@ if "`step2_macromicroinputs'"=="yes" & "`parallel'"=="" {
 *===========================================================================
 if "`step3_runsim'"=="yes" {
 
+
 	forval yyyy = `iniyear'/`finyear' {
 		clear all
 		clear mata
@@ -361,16 +377,8 @@ if "`step3_runsim'"=="yes" {
 		* Declarre simulation year
 		global sim_year = `yyyy'
 		
-		if "`yyyy'"=="`iniyear'" global use_saved_parameters "no"
+		if "`yyyy'"=="`iniyear'" global use_saved_parameters "yes"
 		else 					 global use_saved_parameters "yes"
-		
-		* Load auxiliary simulation programs
-		local files : dir "$dofiles/auxcode" files "*.do"
-		di `files'
-		foreach f of local files{
-			dis in yellow "`f'"
-			qui: run "$dofiles/auxcode/`f'"
-		}
 
 		* Use base household survey
 		if ${year}==2022 use "$data_root/BGD_2022_HIES_v02_M_v02_A_SARMD_SIM_MIN.dta", clear
@@ -379,10 +387,19 @@ if "`step3_runsim'"=="yes" {
 		*gl inputs   "$path/Microsimulation_Inputs_BGD_A3_BaUAM2024.xlsm" // Country's input Excel file
 		gl inputs   "$path/Microsimulation_Inputs_BGD_A3_CrisisAM2024.xlsm"
 		
+		* Load auxiliary simulation programs
+		local files : dir "$dofiles/auxcode" files "*.*do"
+		di `files'
+		foreach f of local files{
+			dis in yellow "`f'"
+			mata: mata set matastrict off
+			qui: run "$dofiles/auxcode/`f'"
+		}
+		
 		* 020.input parameters
 			do "$dofiles/020_parameters.do"
 		* 030.model labor incomes by groups
-			do "$dofiles/030_occupation.do"
+			*do "$dofiles/030_occupation.do"
 		* 040.model labor incomes by skills
 			do "$dofiles/040_labor_income.do"
 		* 050.modeling population growth
@@ -406,11 +423,13 @@ if "`step3_runsim'"=="yes" {
 		* 130. household income
 			do "$dofiles/130_household_income.do"
 		* 140. household consumption
-			*do "$dofiles/140_household_consumption.do"
+			do "$dofiles/140_household_consumption.do"
 			
 		* Quick summary
-			ineqdec0 pc_inc_s  [w=fexp_s]
-			*ineqdec0 pc_con_s  [w=fexp_s]
+			ineqdec0 welfare_ppp17  [w=wgt]
+			ineqdeco pc_con_s		[w=fexp_s]
+			apoverty welfare_ppp17  [w=wgt], line(2.15)
+			apoverty pc_con_s pc_con_preadj [w=fexp_s], line(2.15)
 			
 		drop if welfarenom==.
 		save "${data_out}/basesim_`yyyy'", replace

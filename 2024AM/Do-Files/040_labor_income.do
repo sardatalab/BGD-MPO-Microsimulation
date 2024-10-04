@@ -34,8 +34,8 @@ foreach sector of numlist `numb_sectors' {
 			estimates save "${data_root}/models/${country}_${year}/Income_sector_`sector'_skill_`skill'.dta", replace
 		}
 		else {
-			estimates use "${data_root}/models/${country}_${year}\Income_sector_`sector'_skill_`skill'.dta"
-			estimates esample: `depvar' `ols_rhs' [pw = pondera] if `numsector' == `sector' & skill == `skill'   & sample==1
+			estimates use "${data_root}/models/${country}_${year}/Income_sector_`sector'_skill_`skill'.dta"
+			*estimates esample: `depvar' `ols_rhs' [pw = wgt] if  sect_main  == `sector' & skill == `skill'   & sample==1
 		}
 	
 		mat b_`sector'_`skill' = e(b)
