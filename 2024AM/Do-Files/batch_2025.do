@@ -43,9 +43,9 @@ etime, start
 		
 	* Initial and final year for sequential run
 		local iniyear = 2022 // Initial year when doing sequential runs
-		local finyear = 2026 // Final year when doing sequential runs
+		local finyear = 2022 // Final year when doing sequential runs
 
-	* *local parallel
+	* Local parallel
 		*local parallel 	"yes"	// If "yes", the program will run simulation parallel mode
 
 	* Parallel run set up
@@ -423,15 +423,11 @@ if "`step3_runsim'"=="yes" {
 		* 130. household income
 			do "$dofiles/130_household_income.do"
 		* 140. household consumption
+		error 1
 			do "$dofiles/140_household_consumption.do"
-			
-		* Quick summary
-			ineqdec0 welfare_ppp17  [w=wgt]
-			ineqdeco pc_con_s		[w=fexp_s]
-			apoverty welfare_ppp17  [w=wgt], line(2.15)
-			apoverty pc_con_s pc_con_preadj [w=fexp_s], line(2.15)
-			
-		drop if welfarenom==.
+		* 150. Quick summary
+			do "$dofiles/150_simple_results.do"
+		
 		save "${data_out}/basesim_`yyyy'", replace
 	}
 }

@@ -22,10 +22,7 @@ Notes:
       4. Maximum number of variables is set to 5,000 but can be increased;
           see help set_maxvar.
 
-
-Running C:\Program Files\Stata18\sysprofile.do ...
-
-. do batch_2022.do 
+. do batch_2022 
 
 . *!v2.0
 . *============================================================================
@@ -96,9 +93,9 @@ Running C:\Program Files\Stata18\sysprofile.do ...
 .         * Initial and final year for sequential run
 .                 local iniyear = 2022 // Initial year when doing sequential ru
 > ns
-.                 local finyear = 2026 // Final year when doing sequential runs
+.                 local finyear = 2022 // Final year when doing sequential runs
 . 
-.         * *local parallel
+.         * Local parallel
 .                 *local parallel         "yes"   // If "yes", the program will
 >  run simulation parallel mode
 . 
@@ -140,8 +137,8 @@ Running C:\Program Files\Stata18\sysprofile.do ...
 . * Path  
 .         gl path "$main/BGD-MPO-Microsimulation/2024AM"
 .         cd "$path"
-C:\Users\WB308767\OneDrive\WBG\ETIRI\Projects\FY25\FY25 - SAR MPO AM24\BGD-MPO-
-> Microsimulation\2024AM
+/Users/Israel/Library/CloudStorage/OneDrive-Personal/WBG/ETIRI/Projects/FY25/FY
+> 25 - SAR MPO AM24/BGD-MPO-Microsimulation/2024AM
 .         
 . * Do-files path
 .         global dofiles     "$path/Do-files" // Do-files path
@@ -550,33 +547,28 @@ delimiter now cr
  29.                 * 130. household income
 .                         do "$dofiles/130_household_income.do"
  30.                 * 140. household consumption
-.                         do "$dofiles/140_household_consumption.do"
- 31.                         
-.                 * Quick summary
-.                         ineqdec0 welfare_ppp17  [w=wgt]
- 32.                         ineqdeco pc_con_s               [w=fexp_s]
- 33.                         apoverty welfare_ppp17  [w=wgt], line(2.15)
- 34.                         apoverty pc_con_s pc_con_preadj [w=fexp_s], line(2
-> .15)
- 35.                         
-.                 drop if welfarenom==.
- 36.                 save "${data_out}/basesim_`yyyy'", replace
- 37.         }
-cuantiles.dodesigual.dofgt.dogini.domatnames.domtab1.domyfrappend.adoparam_res.
-> doprog_mata.doshares.dosimchoiceres.dotheil.dozk.do
+.                 error 1
+ 31.                         do "$dofiles/140_household_consumption.do"
+ 32.                 * 150. Quick summary
+.                         do "$dofiles/150_simple_results.do"
+ 33.                 
+.                 save "${data_out}/basesim_`yyyy'", replace
+ 34.         }
+cuantiles.domyfrappend.adoprog_mata.dozk.domtab1.domatnames.dogini.dotheil.dode
+> sigual.doshares.doparam_res.dofgt.dosimchoiceres.do
 cuantiles.do
-desigual.do
-fgt.do
-gini.do
-matnames.do
-mtab1.do
 myfrappend.ado
-param_res.do
 prog_mata.do
-shares.do
-simchoiceres.do
-theil.do
 zk.do
+mtab1.do
+matnames.do
+gini.do
+theil.do
+desigual.do
+shares.do
+param_res.do
+fgt.do
+simchoiceres.do
 
 . *!v1.0
 . *===========================================================================
@@ -691,9 +683,10 @@ xij variables:
 .         tempfile lavdata
 
 . save `lavdata', replace
-(file C:\Users\WB308767\AppData\Local\Temp\ST_660c_000002.tmp not found)
-file C:\Users\WB308767\AppData\Local\Temp\ST_660c_000002.tmp saved as .dta
-    format
+(file /var/folders/fc/5g_0xpf55dz7bg775xzr1vfw0000gp/T//St21669.000002 not
+    found)
+file /var/folders/fc/5g_0xpf55dz7bg775xzr1vfw0000gp/T//St21669.000002 saved
+    as .dta format
 
 . 
 . * macro data (See sheet "input_gpd")
@@ -4057,600 +4050,12 @@ end of do-file
 > =
 . 
 end of do-file
-
-. *!v1.0
-. *============================================================================
-> =
-. * TITLE: 14 - Household consumption
-. *===========================================================================
-. * Prepared by: Israel Osorio-Rodarte
-. * E-mail: iosoriorodarte@worldbank.org
-. *============================================================================
-> =
-. * Created on : Sep 06, 2024
-. * Last update: Sep 06, 2024
-. *============================================================================
-> =
-. * Modified by: 
-. * Modification: 
-. *============================================================================
-> =
-. 
-. 
-. * Generate original welfare aggregate
-.         gen double welfare_ppp17 = ((12/365)*welfarenat/cpi2017/icp2017)
-
-. 
-. * Quintiles at the national level
-.         xtile ntiles = welfare_ppp17 [w=wgt], nq(5)
-(analytic weights assumed)
-
-. 
-. * Variables head, and age of househhold head
-.         gen head = (relationharm==1)
-
-.         gen _agehead = age if head==1
-(47,579 missing values generated)
-
-.         bys hhid: egen agehead = median(_agehead)
-
-.         drop _agehead
-
-. 
-. * Income to consumption ratio (original)
-.         gen double ratio_orig = (ipcf_ppp17/welfare_ppp17)
-
-.         
-. * Impute missing values for male - there shouldn't be any missing values in i
-> ndependent vars
-.         replace male = 0 if male==.     
-(30,855 real changes made)
-
-.                 
-. * Classifying househhold into 4 different cases for changes in per capita inc
-> ome
-.         gen case = .
-(61,849 missing values generated)
-
-. 
-.         replace case =                  0 if (round(ipcf_ppp17,.1)==round(pc_
-> inc_s,.1)) // Remained with the same income, including zero
-(61,826 real changes made)
-
-.         replace case =                  1 if (ipcf_ppp17> 0 & ipcf_ppp17!=.) 
-> & ///
->                                                                  (pc_inc_s> 0
->  & pc_inc_s!=.)     & ///
->                                                                  case!=0     
->                       // Remained with positive income
-(23 real changes made)
-
-.         replace case =                  2 if (ipcf_ppp17==0                ) 
-> & (pc_inc_s> 0 & pc_inc_s!=.)      & case!=0 // Turned to positive income
-(0 real changes made)
-
-.         replace case =                  3 if (ipcf_ppp17> 0 & ipcf_ppp17!=.) 
-> & (pc_inc_s==0              )      & case!=0 // Turned to income equal to zer
-> o
-(0 real changes made)
-
-.         
-.         label define lblcase 0 "Case 0: X=X' -> Y'=Y", add
-
-.         label define lblcase 1 "Case 1: X>0, X'>0, Y>0 -> Y'=Y(X'/X)", add
-
-.         label define lblcase 2 "Case 3: X=0, X'>0, Y>0 -> Y'= n.n.f(determina
-> nts|Y'>Y)", add
-
-.         label define lblcase 3 "Case 4: X>0, X'=0, Y>0 -> Y'= n.n.f(determina
-> nts|Y'<Y)", add    
-
-.         label values case lblcase
-
-.         
-.         gen double nwf = . 
-(61,849 missing values generated)
-
-.         label var nwf "New Welfare at household head level (bridge)"
-
-. 
-. 
-. * Treatment for Case 0: Since initial and final per capita income are equal, 
-> household will continue with
-. *                                          the same per capita consumption
-.         replace nwf = welfare_ppp17 if case==0
-(61,826 real changes made)
-
-.         
-. * Treatment for Case 1: Look for a similar household and import their origina
-> l
-. * income to consumption ratio.
-.                 
-.         
-. * Treatement for Case 2: Household will be matched with the most similar hous
-> ehold considering a higher per capita consumption
-.         gen byte case2_treated = .
-(61,849 missing values generated)
-
-.         replace  case2_treated = 0 if (ipcf_ppp17> 0 & ipcf_ppp17!=.)        
->                                                    // Not treated: Households
->  with initial positive income
-(60,646 real changes made)
-
-.         replace  case2_treated = 1 if (ipcf_ppp17==0                ) & (pc_i
-> nc_s> 0 & pc_inc_s!=.)     // Treated: Households that turned to positive inc
-> ome
-(5 real changes made)
-
-. 
-. * Treatement for Case 3. Household will be matched with the most similar hous
-> ehold considering a lower per capita consumption
-.         gen byte case3_treated = .
-(61,849 missing values generated)
-
-.         replace  case3_treated = 0 if (ipcf_ppp17==0 | (ipcf_ppp17>0 & ipcf_p
-> pp17!=.))                          // Not treated: Households with initial wi
-> th zero income
-(61,849 real changes made)
-
-.         replace  case3_treated = 1 if (ipcf_ppp17> 0 & ipcf_ppp17!=.) & (pc_i
-> nc_s==0              )     // Trated: Households that turned to income equal 
-> to zero
-(0 real changes made)
-
-.         
-. * Case 1
-.         * Setting up the Sample B. Receiver. 
-.                 * Cloning the simulated per capita income
-.                 clonevar ratio_outcome = ratio_orig
-
-.                 clonevar pc_inc_match  = ipcf_ppp17
-
-.         
-.                 local vars_order "hhid pid"
-
-.                 local vars_match "agehead hsize pc_inc_match"
-
-.                 local vars_group "region ntile urban"
-
-.                 local vars_addit "ipcf_ppp17 pc_inc_s welfare_ppp17 ratio_ori
-> g ratio_outcome"
-
-.                 
-.                 
-.                 frame put ratio_orig `vars_order' `vars_match' `vars_group' `
-> vars_addit' if case==1 & h_head==1, into(matreceiver)
-
-.                 frame matreceiver {
-.                         gen case1_treated = 0
-.                 }
-
-.                 
-.         * Setting Sample A. Donor.
-.                 frame copy matreceiver matdonor , replace
-(note: frame matdonor not found)
-
-.                 frame matdonor {
-.                         replace case1_treated = 1
-(5 real changes made)
-.                         replace pc_inc_match  = pc_inc_s
-(5 real changes made)
-.                         replace ratio_outcome = (pc_inc_s/welfare_ppp17)
-(5 real changes made)
-.                 }
-
-.         
-.         * Append both samples
-.         frame change matreceiver
-
-.         myfrappend _all, from(matdonor)
-Number of observations (_N) was 5, now 10.
-(5 real changes made)
-(5 real changes made)
-(5 real changes made)
-(5 real changes made)
-(5 real changes made)
-(5 real changes made)
-(5 real changes made)
-(5 real changes made)
-(5 real changes made)
-(5 real changes made)
-(5 real changes made)
-(5 real changes made)
-(5 real changes made)
-(5 real changes made)
-
-.         frame change default
-
-.         
-.         
-.         frame matreceiver {
-.                 
-.                 egen g = group(`vars_group')
-.                 gen double ratio_sim = .
-(10 missing values generated)
-.                 levelsof g, local(allvarsgroup)
-1 2
-.         
-.                 foreach gr of local allvarsgroup {
-  2.                         
-.                         sort case1_treated `vars_order'
-  3.                         replace ratio_sim = 3
-  4.                         cap psmatch2 case1_treated `vars_match' if g==`gr'
-> , neighbor(1) outcome(ratio_outcome)
-  5.                         if _rc {
-  6.                                 * pc_inc_math predicts data perfectly. Kee
-> p the same ratio_sim
-.                                 replace ratio_sim = ratio_outcome
-  7.                         }
-  8.                         else {
-  9.                                 replace ratio_sim = _ratio_outcome  if g==
-> `gr' & case1_treated==1
- 10.                                 drop _*
- 11.                         }
- 12.                 }
-(10 real changes made)
-(10 real changes made)
-(10 real changes made)
-(4 real changes made)
-.                 
-.                 keep if case1_treated==1
-(5 observations deleted)
-.                 
-.                 
-.         }
-
-.         
-.         frlink m:1 hhid, frame(matreceiver)
-(61,826 observations in frame default unmatched)
-
-.         frget ratio_sim = ratio_sim, from(matreceiver)
-(61,826 missing values generated)
-(1 variable copied from linked frame)
-
-.         
-.         frame drop matreceiver matdonor
-
-.         drop matreceiver
-
-.         drop pc_inc_match ratio_outcome
-
-.         
-.         replace ratio_sim = ratio_orig * 1.2 if (ratio_sim/ratio_orig)>1.2
-(61,829 real changes made)
-
-.         replace ratio_sim = ratio_orig * 0.8 if (ratio_sim/ratio_orig)<0.8
-(0 real changes made)
-
-.         
-.         replace nwf = pc_inc_s / ratio_sim if case==1
-(23 real changes made)
-
-.         */
-.         *replace nwf = welfare_ppp17 * (pc_inc_s/ipcf_ppp17)  if case==1     
->    // This was the default
-.         
-. * Case 2
-. 
-.         sum case2_treated
-
-    Variable |        Obs        Mean    Std. dev.       Min        Max
--------------+---------------------------------------------------------
-case2_trea~d |     60,651    .0000824    .0090793          0          1
-
-.         if r(mean)>0 & r(mean)!=. {
-.                 sort hhid pid
-.                 psmatch2 case2_treated agehead male hsize educ_level i.urban 
-> i.ntiles if head==1 & case2_treated!=., neighbor(1) noreplacement
-note: male != 1 predicts failure perfectly;
-      male omitted and 1601 obs not used.
-
-note: educ_level != 1 predicts failure perfectly;
-      educ_level omitted and 8807 obs not used.
-
-note: 0.urban != 1 predicts failure perfectly;
-      0.urban omitted and 1334 obs not used.
-
-note: 1.ntiles != 0 predicts failure perfectly;
-      1.ntiles omitted and 699 obs not used.
-
-note: 2.ntiles != 1 predicts failure perfectly;
-      2.ntiles omitted and 920 obs not used.
-
-note: 1.urban omitted because of collinearity.
-note: 3.ntiles omitted because of collinearity.
-note: 4.ntiles omitted because of collinearity.
-note: 5.ntiles omitted because of collinearity.
-
-Probit regression                                       Number of obs =    550
-                                                        LR chi2(2)    =   0.05
-                                                        Prob > chi2   = 0.9732
-Log likelihood = -7.281872                              Pseudo R2     = 0.0037
-
-------------------------------------------------------------------------------
-case2_trea~d | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
--------------+----------------------------------------------------------------
-     agehead |   .0044313   .0254025     0.17   0.862    -.0453567    .0542193
-        male |          0  (omitted)
-       hsize |   .0220656   .1522062     0.14   0.885    -.2762531    .3203844
-  educ_level |          0  (omitted)
-             |
-       urban |
-      Urban  |          0  (empty)
-             |
-      ntiles |
-          1  |          0  (empty)
-          2  |          0  (omitted)
-          3  |          0  (empty)
-          4  |          0  (empty)
-          5  |          0  (empty)
-             |
-       _cons |  -3.249086   1.544774    -2.10   0.035    -6.276788   -.2213841
-------------------------------------------------------------------------------
-.                 
-.                 levelsof _id if _treated==1, local(allids)      
-550
-.                 
-.                 foreach id of local allids {
-  2.                         
-.                         noi di "`id'"
-  3.                         sum _pscore if _id==`id'
-  4.                                 scalar ps`id' = r(mean)
-  5.                         sum welfare_ppp17 if _id==`id'
-  6.                                 scalar wf`id' = r(mean)
-  7.                         
-.                         gen double _psd`id' = abs(_pscore - ps`id') if _treat
-> ed==0 & welfare_ppp17>wf`id'
-  8.                                 sum _psd`id'
-  9.                                 scalar mind`id' = r(min)
- 10.                         count if _psd`id' == mind`id'
- 11.                         
-.                         if r(N)==0 {
- 12.                                 noi di "No matching for `id'. Error"
- 13.                                 error 1
- 14.                         }
- 15.                         if r(N)==1 {
- 16.                                 sum welfare_ppp17 if _psd`id'==mind`id'
- 17.                                 replace nwf = r(mean) if _id==`id'
- 18.                         }
- 19.                         if r(N)> 1 & r(N)!=. {
- 20.                                 noi di "Select one, randomly"
- 21.                                 gen _rd = runiform() if _psd`id' == mind`i
-> d'
- 22.                                 sum _rd
- 23.                                         sum welfare_ppp17 if _rd == r(min)
->       
- 24.                                         replace nwf = r(mean) if _id==`id'
- 25.                                 drop _rd
- 26.                         }
- 27.                         
-.                         drop _psd`id'
- 28.                 }
-550
-
-    Variable |        Obs        Mean    Std. dev.       Min        Max
--------------+---------------------------------------------------------
-     _pscore |          1     .001869           .    .001869    .001869
-
-    Variable |        Obs        Mean    Std. dev.       Min        Max
--------------+---------------------------------------------------------
-welfare_p~17 |          1    3.333975           .   3.333975   3.333975
-(61,424 missing values generated)
-
-    Variable |        Obs        Mean    Std. dev.       Min        Max
--------------+---------------------------------------------------------
-     _psd550 |        425    .0003538    .0002963          0   .0029855
-  4
-Select one, randomly
-(61,845 missing values generated)
-
-    Variable |        Obs        Mean    Std. dev.       Min        Max
--------------+---------------------------------------------------------
-         _rd |          4    .4743173    .3731206   .0529707   .9422048
-
-    Variable |        Obs        Mean    Std. dev.       Min        Max
--------------+---------------------------------------------------------
-welfare_p~17 |          1    3.773789           .   3.773789   3.773789
-(1 real change made)
-. 
-.                 drop _pscore _treated _support _weight _id _n1 _nn _pdif
-.         }
-
-.                 
-. * Case 3 - Turning into zero income
-. 
-.         sort hhid pid   
-
-.         * Using a restricted sample may overshoot the regression
-.         *psmatch2 case3_treated agehead hsize educ_level if head==1 & case3_t
-> reated!=., neighbor(1) noreplacement
-.         
-.         sum case3_treated
-
-    Variable |        Obs        Mean    Std. dev.       Min        Max
--------------+---------------------------------------------------------
-case3_trea~d |     61,849           0           0          0          0
-
-.         if r(mean)>0 & r(mean)!=. {
-.                 psmatch2 case3_treated agehead male hsize educ_level i.urban 
-> i.ntiles if head==1 & case3_treated!=., neighbor(1) noreplacement
-.                 
-.                 levelsof _id if _treated==1, local(allids)      
-.                 
-.                 foreach id of local allids {
-  2.                         
-.                         noi di "`id'"
-  3.                         sum _pscore if _id==`id'
-  4.                                 scalar ps`id' = r(mean)
-  5.                         sum welfare_ppp17 if _id==`id'
-  6.                                 scalar wf`id' = r(mean)
-  7.                         
-.                         gen double _psd`id' = abs(_pscore - ps`id') if _treat
-> ed==0 & welfare_ppp17<wf`id'
-  8.                                 sum _psd`id'
-  9.                                 scalar mind`id' = r(min)
- 10.                         count if _psd`id' == mind`id'
- 11.                         
-.                         if r(N)==0 {
- 12.                                 noi di "No matching for `id'. Error"
- 13.                                 error 1
- 14.                         }
- 15.                         if r(N)==1 {
- 16.                                 sum welfare_ppp17 if _psd`id'==mind`id'
- 17.                                 replace nwf = r(mean) if _id==`id'
- 18.                         }
- 19.                         if r(N)> 1 & r(N)!=. {
- 20.                                 noi di "Select one, randomly"
- 21.                                 gen _rd = runiform() if _psd`id' == mind`i
-> d'
- 22.                                 sum _rd
- 23.                                         sum welfare_ppp17 if _rd == r(min)
->       
- 24.                                         replace nwf = r(mean) if _id==`id'
- 25.                                 drop _rd
- 26.                         }
- 27.                         
-.                         drop _psd`id'
- 28.                 }
-. 
-.                 drop _pscore  _support _weight _id _n1 _nn _pdif
-.         }
-
-.         
-.         bys hhid: egen pc_con_s = mean(nwf)
-
-.         
-.         
-.         * Re-scale according to growth in private consumption per capita
-.         sum welfare_ppp17 [w=wgt]
-(analytic weights assumed)
-
-    Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
--------------+-----------------------------------------------------------------
-welfare_p~17 |  61,849   165687181    5.979807   4.656535   .7735212   101.2955
-
-.                 scalar pcconsbase = r(mean)
-
-.                 
-.         sum pc_con_s [w=wgt]
-(analytic weights assumed)
-
-    Variable |     Obs      Weight        Mean   Std. dev.       Min        Max
--------------+-----------------------------------------------------------------
-    pc_con_s |  61,849   165687181    5.979705   4.656543   .7735212   101.2955
-
-.                 scalar pccons_int = r(mean)
-
-.         
-.         scalar objective_pccons = pccons[1,1]+1
-
-.         
-.         rename pc_con_s pc_con_preadj
-
-.         
-.         gen double pc_con_s = pc_con_preadj * (objective_pccons * pcconsbase)
->  / (pccons_int)
-
-.         label var pc_con_s "Final Per Capita Household Consumption"
-
-.         
-.         
-. *============================================================================
-> =
-. *                                     END
-. *============================================================================
-> =
-. 
-.         
-.         
-. 
-end of do-file
-(analytic weights assumed)
- 
-Percentile ratios
-
-----------------------------------------------------------
-  All obs |    p90/p10     p90/p50     p10/p50     p75/p25
-----------+-----------------------------------------------
-          |      4.054       2.146       0.529       2.062
-----------------------------------------------------------
-  
-Generalized Entropy index GE(2), and Gini coefficient
-
-----------------------------------
-  All obs |      GE(2)        Gini
-----------+-----------------------
-          |    0.30319     0.33373
-----------------------------------
-(analytic weights assumed)
- 
-Percentile ratios
-
-----------------------------------------------------------
-  All obs |    p90/p10     p90/p50     p10/p50     p75/p25
-----------+-----------------------------------------------
-          |      4.054       2.146       0.529       2.060
-----------------------------------------------------------
-  
-Generalized Entropy indices GE(a), where a = income difference
- sensitivity parameter, and Gini coefficient
-
-----------------------------------------------------------------------
-  All obs |     GE(-1)       GE(0)       GE(1)       GE(2)        Gini
-----------+-----------------------------------------------------------
-          |    0.19475     0.18170     0.20635     0.30320     0.33373
-----------------------------------------------------------------------
-   
-Atkinson indices, A(e), where e > 0 is the inequality aversion parameter
-
-----------------------------------------------
-  All obs |     A(0.5)        A(1)        A(2)
-----------+-----------------------------------
-          |    0.09200     0.16615     0.28031
-----------------------------------------------
-(analytic weights assumed)
-
-
- The poverty line is set at 2.15 units
-
-
-
--------------------------------------------------
-Poverty measures of welfare_ppp17 | welfare_ppp17
-----------------------------------+--------------
-                Headcount ratio % |         5.008
-Extreme Poverty Headcount ratio % |         0.144
--------------------------------------------------
-
-[aweight= wgt]
-(analytic weights assumed)
-
-
- The poverty line is set at 2.15 units
-
-
-
-----------------------------------------------------------------
-Poverty measures of pc_con_s      |
-pc_con_preadj                     |      pc_con_s  pc_con_preadj
-----------------------------------+-----------------------------
-                Headcount ratio % |         5.008          5.008
-Extreme Poverty Headcount ratio % |         0.144          0.144
-----------------------------------------------------------------
-
-[aweight= fexp_s]
-(7 observations deleted)
-file C:/Users/WB308767/OneDrive/WBG/ETIRI/Projects/FY25/FY25 - SAR MPO
-    AM24/BGD-MPO-Microsimulation/2024AM/Data/OUTPUT/basesim_2022.dta saved
+--Break--
+r(1);
 . }
+--Break--
+r(1);
 
-. *===========================================================================
-. * Display running time  
-. etime
-Elapsed time is 30 seconds 
-
-. *===========================================================================
-. *                                     END
-. *===========================================================================
-. 
 end of do-file
+--Break--
+r(1);

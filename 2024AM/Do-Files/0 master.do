@@ -46,7 +46,7 @@ etime, start
 		local finyear = 2026 // Final year when doing sequential runs
 
 	* Local parallel
-		local parallel 	"yes"	// If "yes", the program will run simulation parallel mode
+		local parallel 	""	// If "yes", the program will run simulation parallel mode
 
 	* Parallel run set up
 		* If local parallel is set to "yes". Then n batch files will be created
@@ -422,6 +422,7 @@ if "`step3_runsim'"=="yes" {
 			if "$random_remittances" == "yes" do "$dofiles/121_assign_nlai.do"
 		* 130. household income
 			do "$dofiles/130_household_income.do"
+			save "${data_out}/baseincsim_`yyyy'", replace
 		* 140. household consumption
 			do "$dofiles/140_household_consumption.do"
 		* 150. Quick summary
