@@ -45,7 +45,7 @@
 	* Read CPI in MacOSX
 	if (c(os)=="MacOSX"|c(os)=="Unix") {
 		noi di ""
-		noi di as text `"Note: MacOSX/Unix, datalibweb skipped. CPI data should exist alreay in the "$data_in/DLW" folder"'
+		noi di as text `"Note: MacOSX/Unix, datalibweb skipped. CPI data should exist already in the "$data_in/DLW" folder"'
 		
 		cap use "$data_root/DLW/datalib_support_2005_GMDRAW.dta", clear
 		if _rc {
@@ -101,12 +101,54 @@
 		}
 	}
 	
-	* Year: 2016 (legacy)
+	* Year: 2016
+	if `year0'==2022 {
+		
+		if c(os)=="Windows" {
+		
+		if "$reload_dlw"=="yes" {
+			foreach module in LBR INC IND GMD {
+				cap datalibweb, country(BGD) year(2016) type(SARMD) vermast(01) veralt(07) survey(HIES) module(`module') clear
+				if _rc {
+					noi di as text "Note: file not found in datalibweb"
+					exit
+				}
+			
+				else {
+					save "$data_root/DLW/HIES/`r(filename)'", replace
+					noi di "`r(filename)'"
+					global `module' "$data_root/DLW/HIES/`r(filename)'"
+				}
+			}
+		}
+		
+		if "$reload_dlw"=="" {
+			noi di ""
+			noi di as text "Windows, datalibweb skipped"
+			foreach module in LBR INC IND GMD {
+				global `module' "$data_root/DLW/HIES/BGD_2026_HIES_v01_M_v07_A_SARMD_`module'.dta"
+			}
+		}
+		
+		}
+		
+		if (c(os)=="MacOSX"|c(os)=="Unix") {
+			noi di ""
+			noi di as text "MacOSX, datalibweb skipped"
+			foreach module in LBR INC IND {	
+				global `module' "$data_root/DLW/HIES/BGD_2026_HIES_v01_M_v07_A_SARMD_`module'.dta"
+			}
+		}
+	}	
+	
+	
+	/* Year: 2016 (legacy)
 	if `year0'==2016 {
 		global LBR "C:/Users/wb553773/OneDrive - WBG/BD/BGD Poverty Assessment 2023/Data/HIES 2016/BGD_2016_HIES_v01_M_v06_A_SARMD_LBR"
 		global INC "C:/Users/wb553773/OneDrive - WBG/BD/BGD Poverty Assessment 2023/Data/HIES 2016/BGD_2016_HIES_v01_M_v06_A_SARMD_INC"
 		global IND "C:/Users/wb553773/OneDrive - WBG/BD/BGD Poverty Assessment 2023/Data/HIES 2016/BGD_2016_HIES_v01_M_v06_A_SARMD_IND"
 	}
+	*/
 	
 	* Year: 2010 (legacy)
 	if `year0'==2010 {

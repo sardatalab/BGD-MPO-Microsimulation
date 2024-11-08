@@ -201,7 +201,8 @@ if "`step1_loadhhdata'"=="yes" & "`parallel'"=="" {
 	
 	* 000. Load data
 	do "$dofiles/001_load_data.do"
-	save "$data_root/BGD_2022_HIES_v02_M_v02_A_SARMD_SIM.dta", replace
+	if $baseyear== 2016 save "$data_root/BGD_2027_HIES_v01_M_v07_A_SARMD_SIM.dta", replace
+	if $baseyear== 2022 save "$data_root/BGD_2022_HIES_v02_M_v03_A_SARMD_SIM.dta", replace
 	
 	
 	* Minimum set of variables for simulation
@@ -254,8 +255,8 @@ if "`step1_loadhhdata'"=="yes" & "`parallel'"=="" {
 		* 040.model labor incomes by skills
 			do "$dofiles/040_labor_income.do"
 	
-	
-	save "$data_root/BGD_2022_HIES_v02_M_v02_A_SARMD_SIM_MIN.dta", replace
+	if $baseyear== 2016 save "$data_root/BGD_2016_HIES_v01_M_v07_A_SARMD_SIM_MIN.dta", replace
+	if $baseyear== 2022 save "$data_root/BGD_2022_HIES_v02_M_v03_A_SARMD_SIM_MIN.dta", replace
 
 }
 
@@ -364,7 +365,7 @@ if "`step2_macromicroinputs'"=="yes" & "`parallel'"=="" {
 	export excel using "$path/input_MASTER.xlsx", sheet("Elasticities") sheetreplace firstrow(variables)
 }
 *===========================================================================
-* run dofiles
+* Step 3: Run simulation
 *===========================================================================
 if "`step3_runsim'"=="yes" {
 
@@ -381,7 +382,8 @@ if "`step3_runsim'"=="yes" {
 		else 					 global use_saved_parameters "yes"
 
 		* Use base household survey
-		if ${year}==2022 use "$data_root/BGD_2022_HIES_v02_M_v02_A_SARMD_SIM_MIN.dta", clear
+		if ${year}==2016 use "$data_root/BGD_2022_HIES_v01_M_v07_A_SARMD_SIM_MIN.dta", clear
+		if ${year}==2022 use "$data_root/BGD_2022_HIES_v02_M_v03_A_SARMD_SIM_MIN.dta", clear
 		
 		* Globals for reading scenarios
 		*gl inputs   "$path/Microsimulation_Inputs_BGD_A3_BaUAM2024.xlsm" // Country's input Excel file
@@ -431,6 +433,19 @@ if "`step3_runsim'"=="yes" {
 		save "${data_out}/basesim_`yyyy'", replace
 	}
 }
+
+*===========================================================================
+* Step 4: Model validation
+*===========================================================================
+
+if "`step4_validation'"=="yes" & "`parallel'"=="" {
+	
+	* Take the household survey from 2016 and simulate the year 2022
+	
+	
+	
+}
+
 *===========================================================================
 * Display running time	
 etime

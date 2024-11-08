@@ -5,15 +5,15 @@
 * Prepared by: Israel Osorio-Rodarte
 * E-mail: iosoriorodarte@worldbank.org
 *=============================================================================
-* Created on : Oct 04, 2024
+* Created on : Oct 24, 2024
 * Last update: Sep 06, 2024
 *=============================================================================
 * Modified by: 
 * Modification: 
 *=============================================================================
-* Declare global for doint psmatch
-* Option "no" would do a simple 1-to-1 income to consumption passthrough
-global do_psmatch "yes"
+
+global do_psmatch "yes"	// Option yes, find most similar household.
+						// Option no, assumes 1-to-1 income to consumption passthrough.
 
 
 * Generate original welfare aggregate
@@ -34,9 +34,13 @@ if "$do_psmatch"=="no" {
 * This is a more match between similar households
 ********************************************************************************
 if "$do_psmatch"=="yes" {
+	
 	* Quintiles at the national level
 		xtile ntiles = welfare_ppp17 [w=wgt], nq(5)
 
+	* Education, should not be missing 
+		replace educ_level = 1 if educ_level==.
+	
 	* Variables head, and age of househhold head
 		gen head = (relationharm==1)
 		gen _agehead = age if head==1
@@ -49,13 +53,22 @@ if "$do_psmatch"=="yes" {
 	* Impute missing values for male - there shouldn't be any missing values in independent vars
 		replace male = 0 if male==.	
 			
-	* Classifying households into 4 different cases for changes in per capita income
+	* This is important.
+	* I'm classifying households into 4 different cases based on changes in per capita income
+	
+	* Case 0: Nothing happens because household remained (practically) with the same income
+	* Case 1: Original income was positive, it changed ("significantly"), and remained positive.
+	* Case 2: From zero original income to positive income
+	* Case 3: From positive original income to simulated zero income.
+	
+		*gen incomeratio = ipcf_ppp17/pc_inc_s if ipcf_ppp17!=0
+		 gen incomeratio = ipcf_ppp17/pc_inc_s if pc_inc_s!=0
 		
 		gen incomeratio = ipcf_ppp17/pc_inc_s if ipcf_ppp17!=0
 
 		gen case = .
 
-		replace case = 			0 if (incomeratio>=.999) & (incomeratio<=1.001) // Remained with "practically" the same income
+		replace case = 			0 if (incomeratio>=.995) & (incomeratio<=1.005) // Remained with "practically" the same income
 		replace case = 			0 if ipcf_ppp17==0 & pc_inc_s==0				// Including zeros
 		
 		replace case = 			1 if (ipcf_ppp17> 0 & ipcf_ppp17!=.) & ///
@@ -98,10 +111,19 @@ if "$do_psmatch"=="yes" {
 			local vars_group "region ntile urban"
 			local vars_addit "ipcf_ppp17 pc_inc_s welfare_ppp17 ratio_orig ratio_outcome"
 			
-		* Create frame for receivers
+		* Create frame for donors
+		* Include all (case==1 | case==0)
+			frame put ratio_orig `vars_order' `vars_match' `vars_group' `vars_addit' if (case==1|case==0) & h_head==1, into(matdonor)
+			frame matdonor {
+				gen case1_treated = 1
+			}
+			
+		* Setting Sample A. (Receive Imputation).
 			frame put ratio_orig `vars_order' `vars_match' `vars_group' `vars_addit' if case==1 & h_head==1, into(matreceiver)
 			frame matreceiver {
 				gen case1_treated = 0
+				replace pc_inc_match  = pc_inc_s			 // ipcf_ppp17
+				replace ratio_outcome = pc_inc_s/ipcf_ppp17  // 
 			}
 			
 		* Setting Sample A.(Donor).
@@ -133,7 +155,7 @@ if "$do_psmatch"=="yes" {
 				if _rc {
 					* This may happen when pc_inc_math predicts data perfectly.
 					* Then keep the original ratio_sim
-					replace ratio_sim = ratio_outcome
+					replace ratio_sim = ratio_outcome if g==`gr' & case1_treated==1
 				}
 				else {
 					replace ratio_sim = _ratio_outcome  if g==`gr' & case1_treated==1
@@ -299,6 +321,57 @@ if "$do_psmatch"=="yes" {
 	
 	gen double pc_con_s = pc_con_preadj * (objective_pccons * pcconsbase) / (pccons_int)
 	label var pc_con_s "Final Per Capita Household Consumption"
+	
+	* Quick summary
+	apoverty pc_con_s [w=fexp_s], line(2.15)
+	ineqdec0 welfare_ppp17 [w=wgt]
+	ineqdec0 pc_con_s      [w=fexp_s]
+	
+	cap sum ratio*
+	
+	* Select the case (0,1,2,3) and calculate the number of individuals
+	* that have income and consumption movement in the same and opposite 
+	* directions
+	local i = 1
+	cap drop ctotal 
+	cap drop cnomov
+	cap drop copposite
+	count if case==`i'
+		scalar total = r(N)
+
+	gen ctotal = (((ipcf_ppp < pc_inc_s & welfare_ppp < pc_con_preadj)) | ///
+				((ipcf_ppp > pc_inc_s & welfare_ppp > pc_con_preadj))) & case==`i'
+	
+	
+	* No movement
+	gen cnomov = (((ipcf_ppp < pc_inc_s & welfare_ppp == pc_con_preadj)) | ///
+			  ((ipcf_ppp > pc_inc_s & welfare_ppp == pc_con_preadj))) & case==`i'
+	sum cnomov
+	scalar nomov = r(sum)
+	
+	* Movement in opposite direction
+	gen csame = (((ipcf_ppp < pc_inc_s & welfare_ppp < pc_con_preadj)) | ///
+			  ((ipcf_ppp > pc_inc_s & welfare_ppp > pc_con_preadj))) & case==`i'
+	sum csame
+	scalar same = r(sum)
+	
+	
+	* Movement in opposite direction
+	gen copposite = (((ipcf_ppp < pc_inc_s & welfare_ppp > pc_con_preadj)) | ///
+			  ((ipcf_ppp > pc_inc_s & welfare_ppp < pc_con_preadj))) & case==`i'
+	sum copposite
+	scalar opposite = r(sum)
+	
+	order case ipcf_ppp welfare_ppp pc_inc_s pc_con_preadj ratio_orig ratio_sim
+	*br case ipcf_ppp pc_inc_s welfare_ppp pc_con_preadj ratio_orig ratio_sim if case==`i' & copposite==1
+	
+	* Equal value 	
+	noi di "% of individuals that go in the same direction in Case `i': " round(100*(same/total),.01)
+	noi di "% of individuals that go in opposite direction in Case `i': " round(100*(opposite/total),.01)
+	
+	
+	
+	*/
 	
 	
 *=============================================================================
